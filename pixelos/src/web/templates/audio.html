@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Audio - PixelOS{% endblock %}
+{% block content %}
+<style>
+.audio-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.audio-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px;
+}
+.audio-card .title { font-weight: 600; font-size: 14px; margin-bottom: 8px; }
+.audio-card .meta { font-size: 12px; color: var(--text-dim); margin-bottom: 12px; }
+.audio-card audio { width: 100%; height: 40px; border-radius: 4px; }
+.recorder-bar {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 20px; margin-bottom: 20px;
+  display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+}
+.recorder-bar .status { font-size: 14px; color: var(--text-dim); }
+.recorder-bar .status.recording { color: var(--red); font-weight: 700; }
+.recorder-bar input[type="text"] {
+  flex: 1; min-width: 150px; padding: 8px 12px;
+  background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px; font-size: 14px;
+}
+.recorder-bar button { white-space: nowrap; }
+.empty-state {
+  text-align: center; padding: 60px 20px; color: var(--text-dim);
+}
+.empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+</style>
+
+<div class="recorder-bar">
+  <span class="status" id="recStatus">Preparer l'enregistrement</span>
+  <button class="btn-red" id="recBtn" onclick="toggleRecord()">Enregistrer</button>
+  <button class="btn-blue" id="playBtn" onclick="playLastRecording()" disabled>Lecture</button>
+  <input type="text" id="audioTitle" placeholder="Titre de l'enregistrement">
+</div>
+
+<div id="audioList" class="audio-grid">
+  <div class="empty-state">
+    <div class="icon">🎤</div>
+    <p>Aucun enregistrement audio</p>
+  </div>
+</div>
+
+<script>
+let mediaRecorder = null;
+let audioChunks = [];
+let lastBlob = null;
+let isRecording = false;
+
+async function loadAudio() {
+  const r = await fetch('/api/programs/audio');
+  const items = await r.json();
+  const container = document.getElementById('audioList');
+
+  if (items.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">🎤</div><p>Aucun enregistrement audio</p></div>';
+    return;
+  }
+
+  container.innerHTML = items.map(a => {
+    const date = new Date(a.created).toLocaleDateString('fr-FR');
+    const size = a.size > 1024 ? (a.size / 1024).toFixed(1) + ' KB' : a.size + ' B';
+    const dur = a.duration ? Math.round(a.duration) + 's' : '';
+    return `<div class="audio-card">
+      <div class="title">${escHtml(a.title)}</div>
+      <div class="meta">${date} &middot; ${size} ${dur ? '&middot; ' + dur : ''}</div>
+      <audio controls src="/api/programs/audio/${a.id}"></audio>
+      <div style="margin-top:8px">
+        <button class="btn-red" onclick="deleteAudio('${a.id}')">Supprimer</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function toggleRecord() {
+  const btn = document.getElementById('recBtn');
+  const status = document.getElementById('recStatus');
+
+  if (isRecording) {
+    mediaRecorder.stop();
+    isRecording = false;
+    btn.textContent = 'Enregistrer';
+    status.className = 'status';
+    status.textContent = 'Enregistrement termine';
+    return;
+  }
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    status.textContent = 'Enregistrement non supporte';
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = e => { audioChunks.push(e.data); };
+
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      lastBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      document.getElementById('playBtn').disabled = false;
+      await uploadAudio(lastBlob);
+    };
+
+    mediaRecorder.start();
+    isRecording = true;
+    btn.textContent = 'Arreter';
+    status.className = 'status recording';
+    status.textContent = 'Enregistrement en cours...';
+  } catch (e) {
+    status.textContent = 'Erreur: ' + e.message;
+  }
+}
+
+function playLastRecording() {
+  if (!lastBlob) return;
+  const url = URL.createObjectURL(lastBlob);
+  const a = new Audio(url);
+  a.play();
+}
+
+async function uploadAudio(blob) {
+  const title = document.getElementById('audioTitle').value.trim() || 'Enregistrement ' + new Date().toLocaleString('fr-FR');
+  const formData = new FormData();
+  formData.append('file', blob, 'enregistrement_' + Date.now() + '.webm');
+  formData.append('title', title);
+  formData.append('duration', Math.round(blob.size / 16000));
+
+  const r = await fetch('/api/programs/audio', { method: 'POST', body: formData });
+  if (r.ok) {
+    document.getElementById('audioTitle').value = '';
+    await loadAudio();
+  }
+}
+
+async function deleteAudio(id) {
+  if (!confirm('Supprimer cet enregistrement ?')) return;
+  await fetch('/api/programs/audio/' + id, { method: 'DELETE' });
+  await loadAudio();
+}
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+loadAudio();
+</script>
+{% endblock %}

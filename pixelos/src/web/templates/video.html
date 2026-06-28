@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Video - PixelOS{% endblock %}
+{% block content %}
+<style>
+.video-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 16px;
+}
+.video-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden;
+}
+.video-card video,
+.video-card iframe {
+  width: 100%; aspect-ratio: 16/9; display: block;
+}
+.video-card .info { padding: 12px 16px; }
+.video-card .title { font-weight: 600; font-size: 14px; }
+.video-card .meta { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+.add-bar {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 20px; margin-bottom: 20px;
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+}
+.add-bar input[type="text"] {
+  flex: 1; min-width: 200px; padding: 8px 12px;
+  background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px; font-size: 14px;
+}
+.add-bar select {
+  padding: 8px 12px; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px; font-size: 14px;
+}
+.empty-state {
+  text-align: center; padding: 60px 20px; color: var(--text-dim);
+}
+.empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+</style>
+
+<div class="add-bar">
+  <input type="text" id="videoTitle" placeholder="Titre de la video">
+  <input type="text" id="videoSource" placeholder="URL ou chemin fichier">
+  <select id="videoType">
+    <option value="url">URL</option>
+    <option value="youtube">YouTube</option>
+    <option value="file">Fichier local</option>
+  </select>
+  <button class="btn-green" onclick="addVideo()">Ajouter</button>
+</div>
+
+<div id="videoList" class="video-grid">
+  <div class="empty-state">
+    <div class="icon">🎬</div>
+    <p>Aucune video</p>
+  </div>
+</div>
+
+<script>
+async function loadVideos() {
+  const r = await fetch('/api/programs/video');
+  const items = await r.json();
+  const container = document.getElementById('videoList');
+
+  if (items.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">🎬</div><p>Aucune video</p></div>';
+    return;
+  }
+
+  container.innerHTML = items.map(v => {
+    const date = new Date(v.created).toLocaleDateString('fr-FR');
+    let player = '';
+
+    if (v.source_type === 'youtube') {
+      let vid = v.source;
+      const match = v.source.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+      if (match) vid = match[1];
+      player = `<iframe src="https://www.youtube.com/embed/${vid}" allowfullscreen></iframe>`;
+    } else if (v.source_type === 'file') {
+      player = `<video controls src="${escHtml(v.source)}"></video>`;
+    } else {
+      if (v.source.match(/\.(mp4|webm|ogg)$/i)) {
+        player = `<video controls src="${escHtml(v.source)}"></video>`;
+      } else {
+        player = `<iframe src="${escHtml(v.source)}" allowfullscreen></iframe>`;
+      }
+    }
+
+    return `<div class="video-card">
+      ${player}
+      <div class="info">
+        <div class="title">${escHtml(v.title)}</div>
+        <div class="meta">${date} &middot; ${v.source_type}
+          <button class="btn-red" style="float:right;padding:4px 10px;font-size:12px" onclick="deleteVideo('${v.id}')">Supprimer</button>
+          <button class="btn-blue" style="float:right;padding:4px 10px;font-size:12px;margin-right:6px" onclick="editVideo('${v.id}')">Editer</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function addVideo() {
+  const title = document.getElementById('videoTitle').value.trim();
+  const source = document.getElementById('videoSource').value.trim();
+  const sourceType = document.getElementById('videoType').value;
+  if (!source) return alert('URL ou chemin requis');
+
+  const r = await fetch('/api/programs/video', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({title: title || null, source, source_type: sourceType})
+  });
+  if (r.ok) {
+    document.getElementById('videoTitle').value = '';
+    document.getElementById('videoSource').value = '';
+    await loadVideos();
+  }
+}
+
+async function editVideo(id) {
+  const newTitle = prompt('Nouveau titre:');
+  if (!newTitle) return;
+  await fetch('/api/programs/video/' + id, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({title: newTitle})
+  });
+  await loadVideos();
+}
+
+async function deleteVideo(id) {
+  if (!confirm('Supprimer cette video ?')) return;
+  await fetch('/api/programs/video/' + id, {method: 'DELETE'});
+  await loadVideos();
+}
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+loadVideos();
+</script>
+{% endblock %}

@@ -324,6 +324,159 @@ if HAS_FLASK:
         svc = ServiceManager()
         return jsonify(svc.health())
 
+    # ── Programmes : Text / Audio / Video ──────────────────
+
+    @app.route("/programs/text")
+    def programs_text_page():
+        return render_template("text.html", title="Notes")
+
+    @app.route("/programs/audio")
+    def programs_audio_page():
+        return render_template("audio.html", title="Audio")
+
+    @app.route("/programs/video")
+    def programs_video_page():
+        return render_template("video.html", title="Video")
+
+    @app.route("/api/programs/notes", methods=["GET"])
+    def api_notes_list():
+        from core.programs import ProgramManager
+        pm = ProgramManager()
+        cat = request.args.get("categorie")
+        q = request.args.get("q")
+        if q:
+            notes = pm.note_search(q)
+        else:
+            notes = pm.notes_list()
+        if cat:
+            notes = [n for n in notes if n.get("categorie") == cat]
+        return jsonify(notes)
+
+    @app.route("/api/programs/notes", methods=["POST"])
+    def api_note_create():
+        from core.programs import ProgramManager
+        data = request.get_json()
+        if not data or not data.get("title"):
+            return jsonify({"error": "title required"}), 400
+        pm = ProgramManager()
+        note = pm.note_create(data["title"], data.get("content", ""),
+                              data.get("categorie", "general"))
+        return jsonify(note), 201
+
+    @app.route("/api/programs/notes/<note_id>", methods=["GET"])
+    def api_note_get(note_id):
+        from core.programs import ProgramManager
+        pm = ProgramManager()
+        note = pm.note_get(note_id)
+        if not note:
+            return jsonify({"error": "not found"}), 404
+        return jsonify(note)
+
+    @app.route("/api/programs/notes/<note_id>", methods=["PUT"])
+    def api_note_update(note_id):
+        from core.programs import ProgramManager
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "no data"}), 400
+        pm = ProgramManager()
+        note = pm.note_update(note_id, data.get("title"),
+                              data.get("content"), data.get("categorie"))
+        if not note:
+            return jsonify({"error": "not found"}), 404
+        return jsonify(note)
+
+    @app.route("/api/programs/notes/<note_id>", methods=["DELETE"])
+    def api_note_delete(note_id):
+        from core.programs import ProgramManager
+        pm = ProgramManager()
+        if pm.note_delete(note_id):
+            return jsonify({"status": "deleted"})
+        return jsonify({"error": "not found"}), 404
+
+    @app.route("/api/programs/notes/categories", methods=["GET"])
+    def api_notes_categories():
+        from core.programs import ProgramManager
+        pm = ProgramManager()
+        return jsonify(pm.note_categories())
+
+    @app.route("/api/programs/audio", methods=["GET"])
+    def api_audio_list():
+        from core.programs import ProgramManager
+        pm = ProgramManager()
+        return jsonify(pm.audio_list())
+
+    @app.route("/api/programs/audio", methods=["POST"])
+    def api_audio_upload():
+        from core.programs import ProgramManager
+        pm = ProgramManager()
+        if "file" not in request.files:
+            return jsonify({"error": "no file"}), 400
+        f = request.files["file"]
+        if not f.filename:
+            return jsonify({"error": "empty file"}), 400
+        from core.programs import AUDIO_DIR
+        fpath = AUDIO_DIR / f.filename
+        f.save(fpath)
+        entry = pm.audio_add(f.filename, request.form.get("title"),
+                             float(request.form.get("duration", 0)),
+                             fpath.stat().st_size)
+        return jsonify(entry), 201
+
+    @app.route("/api/programs/audio/<audio_id>", methods=["GET"])
+    def api_audio_serve(audio_id):
+        from core.programs import ProgramManager
+        pm = ProgramManager()
+        fpath = pm.audio_path(audio_id)
+        if not fpath:
+            return jsonify({"error": "not found"}), 404
+        from flask import send_file
+        return send_file(fpath, mimetype="audio/webm")
+
+    @app.route("/api/programs/audio/<audio_id>", methods=["DELETE"])
+    def api_audio_delete(audio_id):
+        from core.programs import ProgramManager
+        pm = ProgramManager()
+        if pm.audio_delete(audio_id):
+            return jsonify({"status": "deleted"})
+        return jsonify({"error": "not found"}), 404
+
+    @app.route("/api/programs/video", methods=["GET"])
+    def api_video_list():
+        from core.programs import ProgramManager
+        pm = ProgramManager()
+        return jsonify(pm.video_list())
+
+    @app.route("/api/programs/video", methods=["POST"])
+    def api_video_add():
+        from core.programs import ProgramManager
+        data = request.get_json()
+        if not data or not data.get("source"):
+            return jsonify({"error": "source required"}), 400
+        pm = ProgramManager()
+        entry = pm.video_add(data["source"], data.get("title"),
+                             data.get("source_type", "url"),
+                             data.get("duration", 0))
+        return jsonify(entry), 201
+
+    @app.route("/api/programs/video/<video_id>", methods=["PUT"])
+    def api_video_update(video_id):
+        from core.programs import ProgramManager
+        data = request.get_json()
+        pm = ProgramManager()
+        v = pm.video_update(video_id, data.get("title") if data else None,
+                            data.get("source") if data else None)
+        if not v:
+            return jsonify({"error": "not found"}), 404
+        return jsonify(v)
+
+    @app.route("/api/programs/video/<video_id>", methods=["DELETE"])
+    def api_video_delete(video_id):
+        from core.programs import ProgramManager
+        pm = ProgramManager()
+        if pm.video_delete(video_id):
+            return jsonify({"status": "deleted"})
+        return jsonify({"error": "not found"}), 404
+
     @app.route("/api/config")
     def api_config():
         return jsonify(config.data)

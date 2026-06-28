@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}Notes - PixelOS{% endblock %}
+{% block content %}
+<style>
+.editor-layout { display: flex; gap: 20px; height: calc(100vh - 120px); }
+.sidebar-notes {
+  width: 280px; flex-shrink: 0; overflow-y: auto;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px;
+}
+.sidebar-notes .note-item {
+  padding: 10px 12px; border-radius: 6px; cursor: pointer;
+  border-bottom: 1px solid var(--border); transition: 0.15s;
+}
+.sidebar-notes .note-item:hover { background: rgba(88,166,255,0.1); }
+.sidebar-notes .note-item.active { background: rgba(88,166,255,0.2); border-left: 3px solid var(--blue); }
+.sidebar-notes .note-item .note-title { font-weight: 600; font-size: 14px; }
+.sidebar-notes .note-item .note-preview { font-size: 12px; color: var(--text-dim); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-notes .note-item .note-date { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.editor-area { flex: 1; display: flex; flex-direction: column; }
+.editor-toolbar {
+  display: flex; gap: 8px; align-items: center; margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.editor-toolbar input[type="text"],
+.editor-toolbar select {
+  padding: 8px 12px; background: var(--card); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px; font-size: 14px;
+}
+.editor-toolbar input[type="text"] { flex: 1; min-width: 200px; }
+.editor-area textarea {
+  flex: 1; background: var(--card); border: 1px solid var(--border);
+  color: var(--text); border-radius: 8px; padding: 16px;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 14px; line-height: 1.6; resize: none;
+}
+.editor-area textarea:focus { outline: none; border-color: var(--blue); }
+.empty-state {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; height: 100%; color: var(--text-dim);
+}
+.empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+.empty-state p { font-size: 14px; }
+.search-box {
+  width: 100%; padding: 8px 12px; margin-bottom: 8px;
+  background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px; font-size: 13px;
+}
+.cat-tag {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 600; margin-left: 6px;
+}
+.cat-tag.general { background: rgba(88,166,255,0.15); color: var(--blue); }
+.cat-tag.observation { background: rgba(63,185,80,0.15); color: var(--green); }
+.cat-tag.technique { background: rgba(210,153,34,0.15); color: var(--orange); }
+.cat-tag.recolte { background: rgba(248,81,73,0.15); color: var(--red); }
+</style>
+
+<div class="editor-layout">
+  <div class="sidebar-notes">
+    <div class="toolbar" style="margin-bottom:8px">
+      <button class="btn-blue" onclick="newNote()">+ Note</button>
+    </div>
+    <input type="text" class="search-box" placeholder="Rechercher..." oninput="searchNotes(this.value)">
+    <div id="notesList"></div>
+  </div>
+  <div class="editor-area">
+    <div class="editor-toolbar">
+      <input type="text" id="noteTitle" placeholder="Titre de la note">
+      <select id="noteCategorie">
+        <option value="general">General</option>
+        <option value="observation">Observation</option>
+        <option value="technique">Technique</option>
+        <option value="recolte">Recolte</option>
+      </select>
+      <button class="btn-green" onclick="saveNote()">Enregistrer</button>
+      <button class="btn-red" onclick="deleteNote()">Supprimer</button>
+    </div>
+    <textarea id="noteContent" placeholder="Ecrire votre note ici... (Markdown supporte)"></textarea>
+  </div>
+</div>
+
+<script>
+let notes = [];
+let currentId = null;
+
+async function loadNotes() {
+  const r = await fetch('/api/programs/notes');
+  notes = await r.json();
+  renderNotes();
+}
+
+function renderNotes(filter) {
+  const container = document.getElementById('notesList');
+  let items = notes;
+  if (filter) {
+    const q = filter.toLowerCase();
+    items = items.filter(n => n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q));
+  }
+  if (items.length === 0) {
+    container.innerHTML = '<div class="empty-state"><p>Aucune note</p></div>';
+    return;
+  }
+  container.innerHTML = items.map(n => {
+    const active = n.id === currentId ? 'active' : '';
+    const preview = n.content.replace(/\n/g, ' ').substring(0, 60);
+    const date = new Date(n.updated).toLocaleDateString('fr-FR');
+    const catClass = n.categorie || 'general';
+    return `<div class="note-item ${active}" onclick="selectNote('${n.id}')">
+      <div class="note-title">${escHtml(n.title)} <span class="cat-tag ${catClass}">${catClass}</span></div>
+      <div class="note-preview">${escHtml(preview)}</div>
+      <div class="note-date">${date}</div>
+    </div>`;
+  }).join('');
+}
+
+function selectNote(id) {
+  currentId = id;
+  const n = notes.find(x => x.id === id);
+  if (!n) return;
+  document.getElementById('noteTitle').value = n.title;
+  document.getElementById('noteContent').value = n.content;
+  document.getElementById('noteCategorie').value = n.categorie || 'general';
+  renderNotes();
+}
+
+async function saveNote() {
+  const title = document.getElementById('noteTitle').value.trim();
+  const content = document.getElementById('noteContent').value;
+  const categorie = document.getElementById('noteCategorie').value;
+  if (!title) return alert('Titre requis');
+
+  if (currentId) {
+    const r = await fetch(`/api/programs/notes/${currentId}`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({title, content, categorie})
+    });
+    if (!r.ok) return alert('Erreur sauvegarde');
+  } else {
+    const r = await fetch('/api/programs/notes', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({title, content, categorie})
+    });
+    if (!r.ok) return alert('Erreur creation');
+    const note = await r.json();
+    currentId = note.id;
+  }
+  await loadNotes();
+}
+
+function newNote() {
+  currentId = null;
+  document.getElementById('noteTitle').value = '';
+  document.getElementById('noteContent').value = '';
+  document.getElementById('noteCategorie').value = 'general';
+  renderNotes();
+  document.getElementById('noteTitle').focus();
+}
+
+async function deleteNote() {
+  if (!currentId) return;
+  if (!confirm('Supprimer cette note ?')) return;
+  const r = await fetch(`/api/programs/notes/${currentId}`, {method: 'DELETE'});
+  if (r.ok) { currentId = null; newNote(); await loadNotes(); }
+}
+
+function searchNotes(q) { renderNotes(q); }
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+loadNotes();
+</script>
+{% endblock %}

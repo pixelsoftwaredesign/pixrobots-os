@@ -525,6 +525,107 @@ def cmd_service(args):
                     print("  -> pixelos service autostart install")
 
 
+def cmd_program(args):
+    """Programmes PixelOS : Text, Audio, Video."""
+    from core.programs import ProgramManager
+    pm = ProgramManager()
+
+    if args.program == "text":
+        if args.action == "list":
+            notes = pm.notes_list()
+            if args.categorie:
+                notes = [n for n in notes if n.get("categorie") == args.categorie]
+            if args.json:
+                print(json.dumps(notes, indent=2, ensure_ascii=False))
+                return
+            if not notes:
+                print("  Aucune note")
+                return
+            print(f"\n{'ID':<10} {'Titre':<30} {'Categorie':<15} {'Modifie'}")
+            print("-" * 70)
+            for n in notes:
+                d = n["updated"][:10] if n.get("updated") else ""
+                print(f"{n['id']:<10} {n['title']:<30} {n.get('categorie',''):<15} {d}")
+
+        elif args.action == "show":
+            note = pm.note_get(args.note_id)
+            if not note:
+                print(f"Note {args.note_id} introuvable")
+                return
+            if args.json:
+                print(json.dumps(note, indent=2, ensure_ascii=False))
+                return
+            print(f"\n=== {note['title']} ===")
+            print(f"  Categorie : {note.get('categorie', 'general')}")
+            print(f"  Cree      : {note.get('created', '')[:16]}")
+            print(f"  Modifie   : {note.get('updated', '')[:16]}")
+            print(f"\n{note['content']}")
+
+        elif args.action == "create":
+            note = pm.note_create(args.title, args.content or "", args.categorie or "general")
+            print(f"  Note creee: {note['id']} - {note['title']}")
+
+        elif args.action == "edit":
+            note = pm.note_update(args.note_id, args.title, args.content, args.categorie)
+            if note:
+                print(f"  Note mise a jour: {note['id']}")
+            else:
+                print(f"  Note {args.note_id} introuvable")
+
+        elif args.action == "delete":
+            if pm.note_delete(args.note_id):
+                print(f"  Note supprimee: {args.note_id}")
+            else:
+                print(f"  Note {args.note_id} introuvable")
+
+    elif args.program == "audio":
+        if args.action == "list":
+            items = pm.audio_list()
+            if args.json:
+                print(json.dumps(items, indent=2, ensure_ascii=False))
+                return
+            if not items:
+                print("  Aucun enregistrement audio")
+                return
+            print(f"\n{'ID':<10} {'Titre':<35} {'Taille':<10} {'Date'}")
+            print("-" * 70)
+            for a in items:
+                size = f"{a['size']/1024:.1f}KB" if a.get('size') else "?"
+                d = a["created"][:10] if a.get("created") else ""
+                print(f"{a['id']:<10} {a.get('title',''):<35} {size:<10} {d}")
+
+        elif args.action == "delete":
+            if pm.audio_delete(args.audio_id):
+                print(f"  Audio supprime: {args.audio_id}")
+            else:
+                print(f"  Audio {args.audio_id} introuvable")
+
+    elif args.program == "video":
+        if args.action == "list":
+            items = pm.video_list()
+            if args.json:
+                print(json.dumps(items, indent=2, ensure_ascii=False))
+                return
+            if not items:
+                print("  Aucune video")
+                return
+            print(f"\n{'ID':<10} {'Titre':<35} {'Type':<10} {'Date'}")
+            print("-" * 70)
+            for v in items:
+                d = v["created"][:10] if v.get("created") else ""
+                print(f"{v['id']:<10} {v.get('title',''):<35} {v.get('source_type','url'):<10} {d}")
+
+        elif args.action == "add":
+            v = pm.video_add(args.source, args.title, args.type or "url", args.duration or 0)
+            print(f"  Video ajoutee: {v['id']} - {v['title']}")
+
+        elif args.action == "delete":
+            if pm.video_delete(args.video_id):
+                print(f"  Video supprimee: {args.video_id}")
+            else:
+                print(f"  Video {args.video_id} introuvable")
+
+
 def cmd_config(args):
     """Gestion de la configuration."""
     if args.action == "show":
@@ -691,6 +792,22 @@ def main():
     p.add_argument("--tail", type=int, default=50, help="Nombre de lignes de logs")
     p.add_argument("--json", action="store_true", help="Sortie JSON")
     p.set_defaults(func=cmd_service)
+
+    # program
+    p = sub.add_parser("program", help="Programmes Text/Audio/Video")
+    p.add_argument("program", choices=["text", "audio", "video"])
+    p.add_argument("action", choices=["list", "show", "create", "edit", "delete", "add"])
+    p.add_argument("--note-id", help="ID de la note")
+    p.add_argument("--audio-id", help="ID de l'audio")
+    p.add_argument("--video-id", help="ID de la video")
+    p.add_argument("--title", "-t", help="Titre")
+    p.add_argument("--content", "-c", help="Contenu de la note")
+    p.add_argument("--categorie", help="Categorie (general, observation, technique, recolte)")
+    p.add_argument("--source", "-s", help="URL ou chemin video/audio")
+    p.add_argument("--duration", type=int, default=0, help="Duree en secondes")
+    p.add_argument("--type", help="Type de source (url, youtube, file)")
+    p.add_argument("--json", action="store_true", help="Sortie JSON brute")
+    p.set_defaults(func=cmd_program)
 
     # config
     p = sub.add_parser("config", help="Configuration")

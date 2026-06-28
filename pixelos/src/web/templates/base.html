@@ -43,6 +43,7 @@ body {
 }
 .nav a:hover, .nav a.active { color: var(--text); border-bottom-color: var(--green); }
 .nav .spacer { flex: 1; }
+.nav .nav-section { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin: 0 4px; }
 .nav .status-badge { font-size: 12px; color: var(--text-dim); }
 .content { padding: 20px; }
 .stats-grid {
@@ -116,7 +117,11 @@ iframe.streamlit {
   <a href="/" class="{% if request.path == '/' %}active{% endif %}">Dashboard</a>
   <a href="/plantes" class="{% if request.path.startswith('/plantes') %}active{% endif %}">Plantes</a>
   <a href="/services" class="{% if request.path.startswith('/services') %}active{% endif %}">Services</a>
-  <a href="/streamlit" class="{% if request.path.startswith('/streamlit') %}active{% endif %}">Dashboard Streamlit</a>
+  <a href="/streamlit" class="{% if request.path.startswith('/streamlit') %}active{% endif %}">Dashboard</a>
+  <span class="nav-section">Programs</span>
+  <a href="/programs/text" class="{% if request.path.startswith('/programs/text') %}active{% endif %}">Text</a>
+  <a href="/programs/audio" class="{% if request.path.startswith('/programs/audio') %}active{% endif %}">Audio</a>
+  <a href="/programs/video" class="{% if request.path.startswith('/programs/video') %}active{% endif %}">Video</a>
   <span class="spacer"></span>
   <span class="status-badge" id="navStatus"></span>
 </div>
