@@ -1,0 +1,48 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: agricol-backend
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/agricol?useSSL=false&allowPublicKeyRetrieval=true
+    username: agricol
+    password: agricol_secret
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+
+  data:
+    mongodb:
+      host: localhost
+      port: 27017
+      database: agricol_ts
+
+app:
+  mqtt:
+    broker: tcp://localhost:1883
+    client-id: agricol-backend
+    topic-prefix: agricol/
+
+
+  jwt:
+    secret: v9Kp3s8mXn2qR5tY7wE1bA4cD6fH0jL3oP9iU2yG5vB8nM1qW4rT7kX0cZ3fV6
+    expiration: 86400000
+
+  irrigation:
+    default-moisture-threshold: 30
+    check-interval-ms: 60000
+
+logging:
+  level:
+    com.agricol: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG

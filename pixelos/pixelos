@@ -1,0 +1,11 @@
+#!/bin/sh
+# PixelOS - Wrapper CLI
+# Point d'entrée principal du système de gestion agricole
+
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+PYTHON="${PYTHON:-python3}"
+
+# Définir le path pour trouver les modules
+export PYTHONPATH="${SCRIPT_DIR}/src:${PYTHONPATH}"
+
+exec ${PYTHON} -m cli.main "$@"

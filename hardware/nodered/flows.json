@@ -1,0 +1,226 @@
+[
+    {
+        "id": "agricol-root",
+        "type": "tab",
+        "label": "AgriCol Irrigation",
+        "disabled": false,
+        "info": "Logique d'irrigation intelligente"
+    },
+    {
+        "id": "mqtt-input-meteo",
+        "type": "mqtt in",
+        "z": "agricol-root",
+        "name": "Météo",
+        "topic": "agricol/meteo",
+        "qos": "1",
+        "datatype": "json",
+        "broker": "mqtt-broker",
+        "x": 200,
+        "y": 100,
+        "wires": [["meteo-decode"]]
+    },
+    {
+        "id": "meteo-decode",
+        "type": "json",
+        "z": "agricol-root",
+        "name": "Décoder JSON",
+        "property": "payload",
+        "x": 380,
+        "y": 100,
+        "wires": [["check-pluie"]]
+    },
+    {
+        "id": "mqtt-input-sol-serre",
+        "type": "mqtt in",
+        "z": "agricol-root",
+        "name": "Sol Serre",
+        "topic": "agricol/capteur/sol_serre",
+        "qos": "1",
+        "datatype": "json",
+        "broker": "mqtt-broker",
+        "x": 200,
+        "y": 200,
+        "wires": [["decode-sol-serre"]]
+    },
+    {
+        "id": "mqtt-input-sol-champ",
+        "type": "mqtt in",
+        "z": "agricol-root",
+        "name": "Sol Champ",
+        "topic": "agricol/capteur/sol_champ",
+        "qos": "1",
+        "datatype": "json",
+        "broker": "mqtt-broker",
+        "x": 200,
+        "y": 280,
+        "wires": [["decode-sol-champ"]]
+    },
+    {
+        "id": "mqtt-input-sol-verger",
+        "type": "mqtt in",
+        "z": "agricol-root",
+        "name": "Sol Verger",
+        "topic": "agricol/capteur/sol_verger",
+        "qos": "1",
+        "datatype": "json",
+        "broker": "mqtt-broker",
+        "x": 200,
+        "y": 360,
+        "wires": [["decode-sol-verger"]]
+    },
+    {
+        "id": "decode-sol-serre",
+        "type": "json",
+        "z": "agricol-root",
+        "name": "Décoder",
+        "x": 380,
+        "y": 200,
+        "wires": [["check-hum-serre"]]
+    },
+    {
+        "id": "decode-sol-champ",
+        "type": "json",
+        "z": "agricol-root",
+        "name": "Décoder",
+        "x": 380,
+        "y": 280,
+        "wires": [["check-hum-champ"]]
+    },
+    {
+        "id": "decode-sol-verger",
+        "type": "json",
+        "z": "agricol-root",
+        "name": "Décoder",
+        "x": 380,
+        "y": 360,
+        "wires": [["check-hum-verger"]]
+    },
+    {
+        "id": "check-pluie",
+        "type": "function",
+        "z": "agricol-root",
+        "name": "Blocage pluie",
+        "func": "if (msg.payload.pluie > 2.0) {\n    msg.block_irrigation = true;\n    msg.raison = 'Pluie détectée: ' + msg.payload.pluie + ' mm/h';\n    node.warn(msg.raison);\n    node.send([null, msg]);\n} else {\n    msg.block_irrigation = false;\n    node.send([msg, null]);\n}",
+        "outputs": 2,
+        "x": 580,
+        "y": 100,
+        "wires": [[], ["alerte-pluie"]]
+    },
+    {
+        "id": "alerte-pluie",
+        "type": "mqtt out",
+        "z": "agricol-root",
+        "name": "Alerte pluie",
+        "topic": "agricol/alerte/irrigation",
+        "qos": "1",
+        "broker": "mqtt-broker",
+        "x": 880,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "check-hum-serre",
+        "type": "function",
+        "z": "agricol-root",
+        "name": "Seuil Serre (hystérésis 5%)",
+        "func": "const SEUIL_SEC = 30.0;   // Irrigation si < 30%\nconst SEUIL_HUMIDE = 35.0; // Hystérésis: arrêt à 35%\nconst hysteresis = 5.0;\n\nlet hum = msg.payload.hum;\nlet etat = global.get('vanne_serre') || 'FERME';\n\nif (hum < SEUIL_SEC && etat === 'FERME' && !global.get('block_irrigation')) {\n    global.set('vanne_serre', 'OUVERT');\n    msg.topic = 'agricol/commande/vanne/vanne_serre';\n    msg.payload = 'OUVRIR';\n    node.warn('SERRE: humidité ' + hum + '% < ' + SEUIL_SEC + '% => OUVERTURE');\n    return msg;\n}\n\nif (hum >= SEUIL_HUMIDE && etat === 'OUVERT') {\n    global.set('vanne_serre', 'FERME');\n    msg.topic = 'agricol/commande/vanne/vanne_serre';\n    msg.payload = 'FERMER';\n    node.warn('SERRE: humidité ' + hum + '% >= ' + SEUIL_HUMIDE + '% => FERMETURE');\n    return msg;\n}",
+        "outputs": 1,
+        "x": 620,
+        "y": 200,
+        "wires": [["mqtt-cmd-serre"]]
+    },
+    {
+        "id": "check-hum-champ",
+        "type": "function",
+        "z": "agricol-root",
+        "name": "Seuil Champ (hystérésis 5%)",
+        "func": "const SEUIL_SEC = 25.0;\nconst SEUIL_HUMIDE = 30.0;\n\nlet hum = msg.payload.hum;\nlet etat = global.get('vanne_champ') || 'FERME';\n\nif (hum < SEUIL_SEC && etat === 'FERME' && !global.get('block_irrigation')) {\n    global.set('vanne_champ', 'OUVERT');\n    msg.topic = 'agricol/commande/vanne/vanne_champ';\n    msg.payload = 'OUVRIR';\n    return msg;\n}\n\nif (hum >= SEUIL_HUMIDE && etat === 'OUVERT') {\n    global.set('vanne_champ', 'FERME');\n    msg.topic = 'agricol/commande/vanne/vanne_champ';\n    msg.payload = 'FERMER';\n    return msg;\n}",
+        "outputs": 1,
+        "x": 620,
+        "y": 280,
+        "wires": [["mqtt-cmd-champ"]]
+    },
+    {
+        "id": "check-hum-verger",
+        "type": "function",
+        "z": "agricol-root",
+        "name": "Seuil Verger (hystérésis 5%)",
+        "func": "const SEUIL_SEC = 20.0;\nconst SEUIL_HUMIDE = 25.0;\n\nlet hum = msg.payload.hum;\nlet etat = global.get('vanne_verger') || 'FERME';\n\nif (hum < SEUIL_SEC && etat === 'FERME' && !global.get('block_irrigation')) {\n    global.set('vanne_verger', 'OUVERT');\n    msg.topic = 'agricol/commande/vanne/vanne_verger';\n    msg.payload = 'OUVRIR';\n    return msg;\n}\n\nif (hum >= SEUIL_HUMIDE && etat === 'OUVERT') {\n    global.set('vanne_verger', 'FERME');\n    msg.topic = 'agricol/commande/vanne/vanne_verger';\n    msg.payload = 'FERMER';\n    return msg;\n}",
+        "outputs": 1,
+        "x": 620,
+        "y": 360,
+        "wires": [["mqtt-cmd-verger"]]
+    },
+    {
+        "id": "mqtt-cmd-serre",
+        "type": "mqtt out",
+        "z": "agricol-root",
+        "name": "Cmd Serre",
+        "topic": "",
+        "qos": "1",
+        "broker": "mqtt-broker",
+        "x": 880,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "mqtt-cmd-champ",
+        "type": "mqtt out",
+        "z": "agricol-root",
+        "name": "Cmd Champ",
+        "topic": "",
+        "qos": "1",
+        "broker": "mqtt-broker",
+        "x": 880,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "mqtt-cmd-verger",
+        "type": "mqtt out",
+        "z": "agricol-root",
+        "name": "Cmd Verger",
+        "topic": "",
+        "qos": "1",
+        "broker": "mqtt-broker",
+        "x": 880,
+        "y": 360,
+        "wires": []
+    },
+    {
+        "id": "dashboard-debit",
+        "type": "ui_text",
+        "z": "agricol-root",
+        "group": "dashboard-group",
+        "name": "Consommation",
+        "label": "Consommation totale",
+        "format": "{{msg.payload}} L",
+        "layout": "row-spread",
+        "x": 880,
+        "y": 460,
+        "wires": []
+    },
+    {
+        "id": "mqtt-broker",
+        "type": "mqtt-broker",
+        "name": "Broker local",
+        "broker": "localhost",
+        "port": "1883",
+        "clientid": "nodered-agricol",
+        "usetls": false,
+        "compatmode": true
+    },
+    {
+        "id": "dashboard-group",
+        "type": "ui_group",
+        "name": "AgriCol",
+        "tab": "dashboard-tab",
+        "order": 1
+    },
+    {
+        "id": "dashboard-tab",
+        "type": "ui_tab",
+        "name": "Irrigation",
+        "icon": "dashboard"
+    }
+]

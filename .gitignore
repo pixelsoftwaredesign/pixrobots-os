@@ -1,0 +1,54 @@
+# PixelOS / AgriCol - .gitignore
+
+# Environnement
+.env
+.env.local
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.pytest_cache/
+
+# Java / Maven
+target/
+*.class
+*.jar
+*.war
+*.log
+.mvn/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+
+# Node-RED
+node_modules/
+
+# Arduino
+build/
+*.elf
+*.hex
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Backup
+*.tar.gz
+*.bak
+*.old
+
+# Logs
+*.log
+/var/log/

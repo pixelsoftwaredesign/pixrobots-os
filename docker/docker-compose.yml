@@ -1,0 +1,47 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: agricol-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root_secret
+      MYSQL_DATABASE: agricol
+      MYSQL_USER: agricol
+      MYSQL_PASSWORD: agricol_secret
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - agricol-net
+
+  mongodb:
+    image: mongo:6
+    container_name: agricol-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - agricol-net
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: agricol-mosquitto
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+    networks:
+      - agricol-net
+
+  # backend: (lancé via Maven directement)
+  #   build: ../backend
+
+volumes:
+  mysql_data:
+  mongodb_data:
+
+networks:
+  agricol-net:
+    driver: bridge

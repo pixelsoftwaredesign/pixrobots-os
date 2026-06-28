@@ -1,0 +1,73 @@
+# PixelOS - Configuration centrale
+# Fusionnée automatiquement avec configs locales des nœuds
+
+version: "2.0"
+instance_name: "ferme_principale"
+timezone: "Europe/Paris"
+
+mqtt:
+  broker: "localhost"
+  port: 1883
+  client_id: "pixelos-server"
+  topics:
+    capteur: "agricol/capteur/#"
+    commande: "agricol/commande/#"
+    etat: "agricol/etat/#"
+    alerte: "agricol/alerte/#"
+  qos: 1
+
+database:
+  mysql:
+    host: "localhost"
+    port: 3306
+    user: "agricol"
+    password: "${MYSQL_PASSWORD}"
+    database: "agricol"
+  mongodb:
+    uri: "mongodb://localhost:27017/agricol_ts"
+
+backend:
+  api_url: "http://localhost:8080/api"
+  health_endpoint: "/health"
+  timeout: 5000
+
+monitoring:
+  poll_interval: 10         # secondes
+  retention_days: 90
+  alert_channels:
+    email:
+      enabled: false
+      smtp_server: ""
+      recipients: []
+    telegram:
+      enabled: false
+      bot_token: ""
+      chat_id: ""
+
+irrigation:
+  auto_mode: true
+  global_hysteresis: 5.0
+  max_daily_water_per_zone: 1000  # litres
+  night_irrigation: false
+  rain_block_threshold: 2.0       # mm/h
+
+ota:
+  firmware_repo: "/var/lib/pixelos/firmware"
+  arduino_cli_path: "/usr/local/bin/arduino-cli"
+  esp_tool_path: "/usr/local/bin/esptool.py"
+  update_window: "02:00-04:00"    # Créneau mise à jour
+
+watchdog:
+  enabled: true
+  timeout: 30
+  action: "reset"                # reset|poweroff|notify
+
+backup:
+  schedule: "0 3 * * *"         # Tous les jours à 3h
+  retention: 30                 # jours
+  path: "/var/backups/pixelos"
+  include:
+    - "/etc/agricol"
+    - "/var/db/agricol"
+    - "/etc/pf.conf"
+    - "/usr/local/libexec/agricol"

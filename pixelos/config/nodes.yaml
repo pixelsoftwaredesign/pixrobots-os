@@ -1,0 +1,131 @@
+# PixelOS - Déclaration des nœuds
+# Chaque nœud = un microcontrôleur ou un agent edge
+
+nodes:
+  # ─── Capteurs sol (Arduino Mega + RS485) ───
+  - id: sol_serre
+    addr: 10
+    type: capteur_sol
+    location: "Serre nord"
+    communication: rs485
+    protocol: modbus_rtu
+    sensors:
+      humidity: { reg: 0, factor: 0.1, unit: "%", threshold_low: 30, threshold_high: 80 }
+      temperature: { reg: 1, factor: 0.1, unit: "°C" }
+      ph: { reg: 3, factor: 0.01, unit: "pH", range: [6.0, 7.5] }
+      ec: { reg: 4, factor: 1, unit: "µS/cm" }
+    battery: { reg: 7, factor: 0.1, unit: "V", alert_below: 3.3 }
+    irrigation:
+      valve_addr: 30
+      seuil_secheresse: 30.0
+      hysteresis: 5.0
+
+  - id: sol_champ
+    addr: 11
+    type: capteur_sol
+    location: "Champ ouest"
+    communication: rs485
+    protocol: modbus_rtu
+    sensors:
+      humidity: { reg: 0, factor: 0.1, unit: "%", threshold_low: 25, threshold_high: 75 }
+      temperature: { reg: 1, factor: 0.1, unit: "°C" }
+      ph: { reg: 3, factor: 0.01, unit: "pH" }
+      ec: { reg: 4, factor: 1, unit: "µS/cm" }
+    irrigation:
+      valve_addr: 31
+      seuil_secheresse: 25.0
+      hysteresis: 5.0
+
+  - id: sol_verger
+    addr: 12
+    type: capteur_sol
+    location: "Verger est"
+    communication: rs485
+    protocol: modbus_rtu
+    sensors:
+      humidity: { reg: 0, factor: 0.1, unit: "%", threshold_low: 20, threshold_high: 70 }
+      temperature: { reg: 1, factor: 0.1, unit: "°C" }
+    irrigation:
+      valve_addr: 32
+      seuil_secheresse: 20.0
+      hysteresis: 5.0
+
+  # ─── Vannes (ESP32 + RS485) ───
+  - id: vanne_serre
+    addr: 30
+    type: vanne
+    location: "Serre nord"
+    communication: rs485
+    nb_vannes: 3
+    pompe_integree: true
+    fail_safe_timeout: 120  # secondes
+    flow_meter: { pin: 34, pulses_per_liter: 450 }
+
+  - id: vanne_champ
+    addr: 31
+    type: vanne
+    location: "Champ ouest"
+    communication: rs485
+    nb_vannes: 2
+    fail_safe_timeout: 120
+
+  - id: vanne_verger
+    addr: 32
+    type: vanne
+    location: "Verger est"
+    communication: rs485
+    nb_vannes: 2
+    fail_safe_timeout: 120
+
+  # ─── Station météo (ESP32 Wi-Fi) ───
+  - id: station_meteo
+    addr: 20
+    type: meteo
+    location: "Toit hangar"
+    communication: wifi
+    ip: "10.0.100.20"
+    sensors:
+      temperature: { sensor: "DHT22", unit: "°C" }
+      humidity: { sensor: "DHT22", unit: "%" }
+      pression: { sensor: "BMP280", unit: "hPa" }
+      pluie: { sensor: "pluviometre", unit: "mm/h" }
+      vent: { sensor: "anemometre", unit: "km/h" }
+      lumiere: { sensor: "LDR", unit: "lux" }
+    solar_panel: { pin: 39, voltage: 12 }
+
+  # ─── Gateway RS485↔Wi-Fi (ESP32) ───
+  - id: gateway_rs485
+    addr: 1
+    type: gateway
+    location: "Local technique"
+    communication: wifi
+    ip: "10.0.100.2"
+    managed_nodes: [10, 11, 12, 30, 31, 32, 40]
+
+  # ─── Débitmètres eau (Arduino/ESP32) ───
+  - id: debit_serre
+    addr: 40
+    type: debitmetre
+    location: "Compteur serre"
+    communication: rs485
+    pulses_per_liter: 450
+
+  - id: debit_champ
+    addr: 41
+    type: debitmetre
+    location: "Compteur champ"
+    communication: rs485
+    pulses_per_liter: 450
+
+  # ─── Détecteurs mouvement ───
+  - id: pir_serre
+    addr: 50
+    type: pir
+    location: "Serre nord"
+    communication: rs485
+
+  - id: pir_champ
+    addr: 51
+    type: pir
+    location: "Champ ouest"
+    communication: rs485

@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+"""
+PixelOS Web - Interface d'administration web.
+Dashboard unifié pour gérer l'infrastructure agricole.
+"""
+
+import os
+import json
+from pathlib import Path
+from datetime import datetime
+
+try:
+    from flask import Flask, render_template, jsonify, request
+except ImportError:
+    # Mode dégradé sans Flask
+    app = None
+    print("⚠️  Flask non installé: 'pip install pixelos[web]'")
+    HAS_FLASK = False
+else:
+    HAS_FLASK = True
+
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.config import PixelOSConfig
+from core.mqtt import PixelOSMQTT
+
+
+if HAS_FLASK:
+    app = Flask(__name__)
+    config = PixelOSConfig()
+    mqtt = PixelOSMQTT()
+
+    @app.route("/")
+    def index():
+        return render_template("index.html", title="PixelOS - AgriCol")
+
+    @app.route("/api/status")
+    def api_status():
+        """État complet du système en JSON."""
+        nodes_online = []
+        for n in config.nodes.values():
+            nodes_online.append({
+                "id": n["id"],
+                "type": n["type"],
+                "location": n.get("location", ""),
+                "addr": n["addr"],
+                "online": True,  # TODO: heartbeat
+            })
+
+        return jsonify({
+            "instance": config.get("instance_name", "ferme"),
+            "time": datetime.now().isoformat(),
+            "version": "2.0.0",
+            "mqtt": mqtt.connected if hasattr(mqtt, 'connected') else False,
+            "nodes": nodes_online,
+            "nodes_online": len(nodes_online),
+            "nodes_total": len(config.nodes),
+        })
+
+    @app.route("/api/nodes")
+    def api_nodes():
+        return jsonify(list(config.nodes.values()))
+
+    @app.route("/api/node/<node_id>")
+    def api_node(node_id: str):
+        n = config.get_node(node_id)
+        if not n:
+            return jsonify({"error": "Node not found"}), 404
+        return jsonify(n)
+
+    @app.route("/api/alerts")
+    def api_alerts():
+        return jsonify(config.alerts)
+
+    @app.route("/api/irrigation")
+    def api_irrigation():
+        zones = []
+        for n in config.get_nodes_by_type("capteur_sol"):
+            zones.append({
+                "id": n["id"],
+                "location": n.get("location", ""),
+                "seuil": n.get("irrigation", {}).get("seuil_secheresse"),
+                "hysteresis": n.get("irrigation", {}).get("hysteresis"),
+                "valve": n.get("irrigation", {}).get("valve_addr"),
+            })
+        return jsonify({
+            "auto_mode": config.get("irrigation.auto_mode", True),
+            "global_hysteresis": config.get("irrigation.global_hysteresis", 5.0),
+            "rain_block": config.get("irrigation.rain_block_threshold", 2.0),
+            "zones": zones,
+        })
+
+    @app.route("/api/command", methods=["POST"])
+    def api_command():
+        """Envoyer une commande à un nœud."""
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Invalid JSON"}), 400
+
+        node_id = data.get("node")
+        command = data.get("command")
+
+        topic = f"agricol/commande/{node_id}"
+        mqtt.publish(topic, {"cmd": command})
+        return jsonify({"status": "sent", "topic": topic, "command": command})
+
+    @app.route("/api/config")
+    def api_config():
+        return jsonify(config.data)
+
+    @app.route("/api/config", methods=["POST"])
+    def api_config_set():
+        data = request.get_json()
+        key = data.get("key")
+        value = data.get("value")
+        if key and value:
+            config.set(key, value)
+            return jsonify({"status": "ok", "key": key, "value": value})
+        return jsonify({"error": "key and value required"}), 400
+
+    def main():
+        port = int(os.environ.get("PIXELOS_WEB_PORT", 9999))
+        debug = os.environ.get("PIXELOS_DEBUG", "0") == "1"
+        print(f"PixelOS Web - http://0.0.0.0:{port}")
+        app.run(host="0.0.0.0", port=port, debug=debug)
+
+
+if __name__ == "__main__":
+    if HAS_FLASK:
+        main()
+    else:
+        print("pip install pixelos[web] pour le dashboard web")

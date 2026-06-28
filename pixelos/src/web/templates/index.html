@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PixelOS - AgriCol</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --card: #161b22;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-dim: #8b949e;
+  --green: #3fb950;
+  --red: #f85149;
+  --orange: #d29922;
+  --blue: #58a6ff;
+  --accent: #2ea043;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 20px;
+}
+.header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid var(--border);
+}
+.header h1 { font-size: 24px; }
+.header h1 span { color: var(--green); }
+.header .status { font-size: 14px; color: var(--text-dim); }
+.header .status .dot { display: inline-block; width: 10px; height: 10px;
+  border-radius: 50%; margin-right: 6px; }
+.dot.green { background: var(--green); }
+.dot.red { background: var(--red); }
+.stats-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px; margin-bottom: 30px;
+}
+.stat-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 20px;
+}
+.stat-card .label { font-size: 12px; color: var(--text-dim); text-transform: uppercase;
+  letter-spacing: 0.5px; }
+.stat-card .value { font-size: 32px; font-weight: 700; margin-top: 8px; }
+.stat-card .value.green { color: var(--green); }
+.stat-card .value.red  { color: var(--red); }
+.stat-card .value.blue { color: var(--blue); }
+.section-title { font-size: 18px; margin: 30px 0 16px; }
+table {
+  width: 100%; background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; border-collapse: collapse; overflow: hidden;
+}
+th { text-align: left; padding: 12px 16px; font-size: 12px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--text-dim); border-bottom: 1px solid var(--border); }
+td { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+tr:last-child td { border-bottom: none; }
+.badge {
+  display: inline-block; padding: 2px 10px; border-radius: 12px;
+  font-size: 12px; font-weight: 600;
+}
+.badge.online { background: rgba(63,185,80,0.15); color: var(--green); }
+.badge.offline { background: rgba(248,81,73,0.15); color: var(--red); }
+.badge.sensor { background: rgba(88,166,255,0.15); color: var(--blue); }
+.badge.valve  { background: rgba(210,153,34,0.15); color: var(--orange); }
+.refresh { cursor: pointer; color: var(--blue); font-size: 14px; text-decoration: none; }
+.refresh:hover { text-decoration: underline; }
+.alerts-list { list-style: none; }
+.alert-item {
+  padding: 12px 16px; border-left: 3px solid var(--orange);
+  background: var(--card); margin-bottom: 8px; border-radius: 0 6px 6px 0;
+}
+.alert-item.critical { border-left-color: var(--red); }
+.alert-item .alert-name { font-weight: 600; }
+.alert-item .alert-desc { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🌿 <span>PixelOS</span> AgriCol</h1>
+  <div class="status">
+    <span class="dot green" id="mqttDot"></span>
+    <span id="mqttStatus">MQTT: --</span>
+    &middot;
+    <a href="#" class="refresh" onclick="fetchStatus()">↻</a>
+  </div>
+</div>
+
+<div class="stats-grid" id="stats">
+  <div class="stat-card">
+    <div class="label">Nœuds en ligne</div>
+    <div class="value blue" id="nodesOnline">--</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Total nœuds</div>
+    <div class="value" id="nodesTotal">--</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Zones irrigation</div>
+    <div class="value green" id="zonesCount">--</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Alertes</div>
+    <div class="value red" id="alertsCount">--</div>
+  </div>
+</div>
+
+<div class="section-title">📡 Nœuds</div>
+<table>
+  <thead><tr>
+    <th>ID</th><th>Type</th><th>Adresse</th><th>Localisation</th><th>Communication</th><th>Status</th>
+  </tr></thead>
+  <tbody id="nodesTable"></tbody>
+</table>
+
+<div class="section-title">⚠️ Règles d'alerte</div>
+<ul class="alerts-list" id="alertsList"></ul>
+
+<script>
+async function fetchStatus() {
+  try {
+    const res = await fetch('/api/status');
+    const data = await res.json();
+    document.getElementById('nodesOnline').textContent = data.nodes_online;
+    document.getElementById('nodesTotal').textContent = data.nodes_total;
+    document.getElementById('mqttDot').className = 'dot ' + (data.mqtt ? 'green' : 'red');
+    document.getElementById('mqttStatus').textContent = 'MQTT: ' + (data.mqtt ? 'OK' : 'DOWN');
+
+    const tbody = document.getElementById('nodesTable');
+    tbody.innerHTML = '';
+    data.nodes.forEach(n => {
+      const tr = document.createElement('tr');
+      const typeBadge = n.type === 'capteur_sol' ? 'sensor' :
+                        n.type === 'vanne' ? 'valve' : '';
+      tr.innerHTML = `
+        <td><strong>${n.id}</strong></td>
+        <td><span class="badge ${typeBadge}">${n.type}</span></td>
+        <td>${n.addr}</td>
+        <td>${n.location}</td>
+        <td>${n.communication || '—'}</td>
+        <td><span class="badge ${n.online ? 'online' : 'offline'}">${n.online ? 'ONLINE' : 'OFFLINE'}</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+async function fetchAlerts() {
+  try {
+    const res = await fetch('/api/alerts');
+    const alerts = await res.json();
+    const list = document.getElementById('alertsList');
+    list.innerHTML = '';
+    document.getElementById('alertsCount').textContent = alerts.length;
+
+    // Afficher les 10 premières
+    alerts.slice(0, 10).forEach(a => {
+      const li = document.createElement('li');
+      li.className = 'alert-item ' + (a.severity === 'critical' ? 'critical' : '');
+      li.innerHTML = `
+        <div class="alert-name">${a.name}</div>
+        <div class="alert-desc">${a.description || a.condition || ''}</div>
+        <div style="margin-top:4px;font-size:12px;color:var(--text-dim)">
+          ${a.severity} · actions: ${(a.actions || []).join(', ')}
+        </div>
+      `;
+      list.appendChild(li);
+    });
+  } catch(e) {}
+}
+
+async function fetchIrrigation() {
+  try {
+    const res = await fetch('/api/irrigation');
+    const data = await res.json();
+    document.getElementById('zonesCount').textContent = data.zones.length;
+  } catch(e) {}
+}
+
+fetchStatus();
+fetchAlerts();
+fetchIrrigation();
+setInterval(fetchStatus, 10000);
+</script>
+</body>
+</html>

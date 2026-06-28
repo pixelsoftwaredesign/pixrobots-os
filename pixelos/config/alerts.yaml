@@ -1,0 +1,105 @@
+# PixelOS - Règles d'alerte
+
+alerts:
+  # ─── Capteurs ───
+  - name: "humidité_basse"
+    description: "Humidité du sol sous le seuil pendant trop longtemps"
+    condition: "avg(node.sensors.humidity, 5m) < node.irrigation.seuil_secheresse"
+    severity: warning
+    duration: 10m
+    actions: ["log", "mqtt:agricol/alerte/secheresse", "notify"]
+
+  - name: "humidité_critique"
+    condition: "avg(node.sensors.humidity, 2m) < 10"
+    severity: critical
+    duration: 1m
+    actions: ["log", "mqtt:agricol/alerte/secheresse_critique",
+              "notify", "auto_irrigate"]
+
+  - name: "temperature_extreme"
+    condition: "node.sensors.temperature > 45 or node.sensors.temperature < -5"
+    severity: warning
+    duration: 5m
+    actions: ["log", "mqtt:agricol/alerte/temperature"]
+
+  - name: "ph_anormal"
+    condition: "node.sensors.ph < 5.5 or node.sensors.ph > 8.0"
+    severity: warning
+    actions: ["log", "notify"]
+
+  # ─── Batterie ───
+  - name: "batterie_faible"
+    condition: "node.battery.voltage < 3.5"
+    severity: warning
+    duration: 10m
+    actions: ["log", "notify"]
+
+  - name: "batterie_critique"
+    condition: "node.battery.voltage < 3.2"
+    severity: critical
+    actions: ["log", "notify_urgent"]
+
+  # ─── Communication ───
+  - name: "node_offline"
+    condition: "node.last_seen > 5m"
+    severity: critical
+    duration: 5m
+    actions: ["log", "notify", "mqtt:agricol/alerte/offline"]
+
+  - name: "mqtt_broker_down"
+    condition: "pixelos.mqtt.connected == false"
+    severity: critical
+    actions: ["restart_mqtt", "log", "notify_urgent"]
+
+  # ─── Irrigation ───
+  - name: "debit_anormal"
+    description: "Débit d'eau anormal (fuite probable)"
+    condition: "node.flow_rate > node.flow_rate_normal * 1.5"
+    severity: critical
+    duration: 30s
+    actions: ["close_valve", "log", "notify_urgent"]
+
+  - name: "consommation_quotidienne_max"
+    condition: "daily_water > node.irrigation.max_daily_water"
+    severity: warning
+    actions: ["block_irrigation", "log", "notify"]
+
+  - name: "irrigation_longue"
+    description: "Irrigation qui dure anormalement longtemps"
+    condition: "valve.open_duration > 60m"
+    severity: warning
+    actions: ["close_valve", "log", "notify"]
+
+  # ─── Infrastructure ───
+  - name: "cpu_high"
+    condition: "pixelos.server.cpu > 90"
+    severity: warning
+    duration: 5m
+    actions: ["log", "notify"]
+
+  - name: "disk_full"
+    condition: "pixelos.server.disk.free < 10"
+    severity: critical
+    actions: ["log", "notify_urgent"]
+
+  - name: "watchdog_triggered"
+    condition: "pixelos.watchdog.count > 0"
+    severity: critical
+    actions: ["log", "notify_urgent"]
+
+  # ─── Météo ───
+  - name: "pluie_forte"
+    condition: "meteo.pluie > 10"
+    severity: warning
+    actions: ["block_irrigation", "log"]
+
+  - name: "vent_fort"
+    condition: "meteo.vent > 60"
+    severity: warning
+    actions: ["log"]
+
+  - name: "gel"
+    condition: "meteo.temperature < 0"
+    severity: warning
+    duration: 15m
+    actions: ["log", "notify", "open_valve_protect"]  # Anti-gel
