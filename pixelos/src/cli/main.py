@@ -321,8 +321,122 @@ def cmd_zone(args):
                 print(f"❌ Échec création AP: {e}")
 
 
+def cmd_plante(args):
+    """Base de donnees agronomique des plantes."""
+    from core.plantes_db import PlantesDB
+    db = PlantesDB()
+
+    if args.action == "list":
+        rows = db.list_plantes(args.categorie, args.cycle)
+        if args.json:
+            print(json.dumps(rows, indent=2, ensure_ascii=False, default=str))
+            return
+        print(f"\n{'ID':<4} {'Nom':<25} {'Scientifique':<30} {'Categorie':<20} {'Cycle':<10}")
+        print("-"*90)
+        for r in rows:
+            print(f"{r['id']:<4} {r['nom_commun']:<25} {r['nom_scientifique']:<30} {r['categorie']:<20} {r['cycle_vie']:<10}")
+
+    elif args.action == "search":
+        rows = db.search(args.query)
+        if args.json:
+            print(json.dumps(rows, indent=2, ensure_ascii=False, default=str))
+            return
+        if not rows:
+            print(f"Aucune plante trouvee pour '{args.query}'")
+            return
+        print(f"\n{len(rows)} resultat(s) pour '{args.query}':")
+        for r in rows:
+            print(f"  [{r['id']}] {r['nom_commun']} ({r['nom_scientifique']}) - {r['categorie']}")
+            if r.get('famille'):
+                print(f"       Famille: {r['famille']}, Cycle: {r['cycle_vie']}")
+
+    elif args.action == "info":
+        row = db.get_plante(args.query)
+        if not row:
+            print(f"Plante non trouvee: {args.query}")
+            return
+        if args.json:
+            print(json.dumps(row, indent=2, ensure_ascii=False, default=str))
+            return
+        print(f"\n=== {row['nom_commun']} ({row['nom_scientifique']}) ===")
+        print(f"  Categorie : {row['categorie']}")
+        print(f"  Famille   : {row.get('famille', 'N/A')}")
+        print(f"  Cycle     : {row['cycle_vie']}")
+        print(f"  Desc      : {row.get('description', '')}")
+
+        vars = row.get('varietes', [])
+        if vars:
+            print(f"\n  Varietes ({len(vars)}) :")
+            for v in vars:
+                print(f"    - {v['nom']} (eau: {v['besoin_eau']}, rendement: {v.get('rendement_estime','N/A')})")
+
+        cals = row.get('calendriers', [])
+        if cals:
+            print(f"\n  Calendrier :")
+            for c in cals:
+                print(f"    Semis: {c.get('mois_semis_debut','?')}-{c.get('mois_semis_fin','?')}, Recolte: {c.get('mois_recolte_debut','?')}-{c.get('mois_recolte_fin','?')}, Cycle: {c.get('duree_cycle_jours','?')}j")
+
+        mal = row.get('maladies', [])
+        if mal:
+            print(f"\n  Maladies ({len(mal)}) :")
+            for m in mal:
+                print(f"    - {m['nom']} ({m['type_agent']})")
+
+    elif args.action == "categorie":
+        rows = db.list_categories()
+        if args.json:
+            print(json.dumps(rows, indent=2, ensure_ascii=False, default=str))
+            return
+        print(f"\n{'ID':<4} {'Categorie':<30} {'Plantes':<8}")
+        print("-"*45)
+        for r in rows:
+            print(f"{r['id']:<4} {r['nom']:<30} {r.get('nb_plantes', 0):<8}")
+
+    elif args.action == "maladies":
+        rows = db.list_maladies(args.query)
+        if args.json:
+            print(json.dumps(rows, indent=2, ensure_ascii=False, default=str))
+            return
+        if args.query:
+            print(f"\nMaladies de '{args.query}':")
+        else:
+            print(f"\n{'ID':<4} {'Maladie':<30} {'Agent':<15} {'Traitement':<40}")
+            print("-"*90)
+        for r in rows:
+            print(f"{r['id']:<4} {r['nom']:<30} {r.get('type_agent',''):<15} {r.get('type_traitement',''):<40}")
+
+    elif args.action == "calendrier":
+        fine = args.besoin_eau or args.categorie
+        rows = db.get_calendrier(args.query, fine)
+        if args.json:
+            print(json.dumps(rows, indent=2, ensure_ascii=False, default=str))
+            return
+        if not rows:
+            print("Aucun calendrier trouve")
+            return
+        print(f"\n{'Variete':<25} {'Semis':<15} {'Recolte':<15} {'Cycle':<8}")
+        print("-"*65)
+        for r in rows:
+            semis = f"{r.get('mois_semis_debut','?')}-{r.get('mois_semis_fin','?')}"
+            rec = f"{r.get('mois_recolte_debut','?')}-{r.get('mois_recolte_fin','?')}"
+            print(f"{r.get('variete',''):<25} {semis:<15} {rec:<15} {r.get('duree_cycle_jours','?'):<8}")
+
+    elif args.action == "irrigation":
+        rows = db.get_irrigation(args.query, args.categorie)
+        if args.json:
+            print(json.dumps(rows, indent=2, ensure_ascii=False, default=str))
+            return
+        if not rows:
+            print("Aucune donnee irrigation trouvee")
+            return
+        print(f"\n{'Variete':<25} {'Methode':<18} {'mm/sem':<8} {'Freq(j)':<8} {'Duree(min)':<10} {'Stade critique'}")
+        print("-"*120)
+        for r in rows:
+            print(f"{r.get('variete',''):<25} {r.get('methode',''):<18} {str(r.get('frequence_mm_semaine','')):<8} {str(r.get('frequence_jours','')):<8} {str(r.get('duree_minutes','')):<10} {r.get('stade_critique','')}")
+
+
 def cmd_predict(args):
-    """Moteur de prédiction IA."""
+    """Moteur de prediction IA."""
     from core.predictor import PredictorCLI
     PredictorCLI.handle(args)
 
@@ -472,6 +586,17 @@ def main():
     p.add_argument("--create-ap", action="store_true",
                    help="Créer un point d'accès Wi-Fi beacon")
     p.set_defaults(func=cmd_zone)
+
+    # plante
+    p = sub.add_parser("plante", help="Base de donnees agronomique")
+    p.add_argument("action", choices=["list", "search", "info", "categorie",
+                                      "maladies", "calendrier", "irrigation"])
+    p.add_argument("query", nargs="?", help="Nom de plante ou ID")
+    p.add_argument("--categorie", "-c", help="Filtrer par categorie")
+    p.add_argument("--cycle", help="Cycle (annuel, perenne...)")
+    p.add_argument("--besoin-eau", help="besoin_eau (faible, moyen, eleve)")
+    p.add_argument("--json", action="store_true", help="Sortie JSON brute")
+    p.set_defaults(func=cmd_plante)
 
     # config
     p = sub.add_parser("config", help="Configuration")

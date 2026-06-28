@@ -341,22 +341,29 @@ class PredictorEngine:
 
 
 class PredictorCLI:
-    """Interface CLI pour le moteur de prédiction."""
+    """Interface CLI pour le moteur de prediction."""
+
+    @staticmethod
+    def _e(t: str) -> str:
+        """Strip emoji for Windows cp1252."""
+        import re
+        return re.sub(r'[^\x00-\x7F]+', '', t).strip()
 
     @staticmethod
     def handle(args):
         engine = PredictorEngine()
+        e = PredictorCLI._e
 
         if args.action == "train":
             result = engine.train(days=args.days or 30, zone=args.zone or "sol_serre")
-            print(f"\n📊 Entraînement terminé :")
-            print(f"   Échantillons : {result.get('samples', 'N/A')}")
+            print(f"\n{e('--- Entrainement termine ---')}")
+            print(f"   Echantillons : {result.get('samples', 'N/A')}")
             print(f"   MAE          : {result.get('mae', 'N/A')}%")
-            print(f"   R²           : {result.get('r2_score', 'N/A')}")
-            print(f"   Précision    : {result.get('accuracy_pct', 'N/A')}%")
-            print(f"\n🧬 Features importantes :")
+            print(f"   R2           : {result.get('r2_score', 'N/A')}")
+            print(f"   Precision    : {result.get('accuracy_pct', 'N/A')}%")
+            print(f"\nFeatures importantes :")
             for f in result.get("features", []):
-                bar = "█" * int(f["importance"] * 40)
+                bar = "#" * int(f["importance"] * 40)
                 print(f"   {f['name']:<20} {bar} {f['importance']:.1%}")
 
         elif args.action == "predict":
@@ -367,24 +374,24 @@ class PredictorCLI:
 
             result = engine.predict(data)
             if result.get("status") == "error":
-                print(f"❌ {result['message']}")
+                print(f"{e('ERROR')}: {result['message']}")
                 return
 
-            print(f"\n🔮 Prédiction humidité (6h) :")
+            print(f"\n{e('Prediction humidite (6h) :')}")
             print(f"   Actuelle     : {result['current_humidity']}%")
-            print(f"   Prédite (6h) : {result['predicted_humidity_6h']}%")
+            print(f"   Predite (6h) : {result['predicted_humidity_6h']}%")
             print(f"   Taux chute   : {result['drop_rate_pct_per_h']}%/h")
             print(f"   Seuil        : dans {result['hours_to_critical_threshold']}h")
-            print(f"   Eau nécessaire : {result['water_needed_l_per_m2']} L/m²")
+            print(f"   Eau necessaire : {result['water_needed_l_per_m2']} L/m2")
             print(f"   Confiance    : {result['confidence_pct']}%")
-            print(f"\n💡 {result['recommendation']}")
+            print(f"\n>>> {result['recommendation']}")
 
         elif args.action == "stats":
             s = engine.stats()
             if s["status"] == "no_model":
-                print("❌ Aucun modèle entraîné. Lancer 'pixelos predict train'")
+                print("Aucun modele entraine. Lancer 'pixelos predict train'")
                 return
-            print(f"\n🧠 Modèle : {s['model_type']}")
+            print(f"\nModele : {s['model_type']}")
             print(f"   Estimators : {s['n_estimators']}")
             print(f"   Features   : {s['n_features']}")
             print(f"   Taille     : {s['model_size_kb']} Ko")
@@ -401,9 +408,9 @@ class PredictorCLI:
             }
             anomalies = engine.detect_anomalies(telemetry)
             if not anomalies:
-                print("✅ Aucune anomalie détectée")
+                print("Aucune anomalie detectee")
                 return
-            print(f"\n🚨 {len(anomalies)} anomalie(s) détectée(s) :")
+            print(f"\n{len(anomalies)} anomalie(s) detectee(s) :")
             for a in anomalies:
-                icon = {"critical": "🔴", "warning": "🟡"}.get(a["severity"], "⚪")
-                print(f"   {icon} [{a['type']}] {a['message']}")
+                sev = {"critical": "CRIT", "warning": "WARN"}.get(a["severity"], "INFO")
+                print(f"   [{sev}] [{a['type']}] {a['message']}")

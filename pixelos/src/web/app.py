@@ -213,6 +213,60 @@ if HAS_FLASK:
         anomalies = engine.detect_anomalies(data)
         return jsonify(anomalies)
 
+    @app.route("/api/plantes")
+    def api_plantes_list():
+        from core.plantes_db import PlantesDB
+        db = PlantesDB()
+        cat = request.args.get("categorie")
+        cycle = request.args.get("cycle")
+        rows = db.list_plantes(cat, cycle)
+        return jsonify(rows)
+
+    @app.route("/api/plantes/search")
+    def api_plantes_search():
+        from core.plantes_db import PlantesDB
+        q = request.args.get("q", "")
+        db = PlantesDB()
+        rows = db.search(q)
+        return jsonify(rows)
+
+    @app.route("/api/plantes/<ident>")
+    def api_plantes_detail(ident):
+        from core.plantes_db import PlantesDB
+        db = PlantesDB()
+        row = db.get_plante(ident)
+        if not row:
+            return jsonify({"error": "not found"}), 404
+        return jsonify(row)
+
+    @app.route("/api/categories")
+    def api_categories():
+        from core.plantes_db import PlantesDB
+        db = PlantesDB()
+        return jsonify(db.list_categories())
+
+    @app.route("/api/maladies")
+    def api_maladies():
+        from core.plantes_db import PlantesDB
+        db = PlantesDB()
+        plante = request.args.get("plante")
+        return jsonify(db.list_maladies(plante))
+
+    @app.route("/api/calendrier")
+    def api_calendrier():
+        from core.plantes_db import PlantesDB
+        db = PlantesDB()
+        variete = request.args.get("variete")
+        return jsonify(db.get_calendrier(variete))
+
+    @app.route("/api/irrigation")
+    def api_irrigation():
+        from core.plantes_db import PlantesDB
+        db = PlantesDB()
+        variete = request.args.get("variete")
+        cat = request.args.get("categorie")
+        return jsonify(db.get_irrigation(variete, cat))
+
     @app.route("/api/config")
     def api_config():
         return jsonify(config.data)
