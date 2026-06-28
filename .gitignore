@@ -54,5 +54,8 @@ Desktop.ini
 /var/log/
 
 # ML models (regenerate with: pixelos predict train)
-models/
-!models/.gitkeep
+pixelos/models/
+!pixelos/models/.gitkeep
+
+# PixelOS logs
+pixelos/logs/

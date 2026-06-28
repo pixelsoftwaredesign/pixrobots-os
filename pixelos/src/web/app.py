@@ -267,6 +267,33 @@ if HAS_FLASK:
         cat = request.args.get("categorie")
         return jsonify(db.get_irrigation(variete, cat))
 
+    @app.route("/api/services")
+    def api_services():
+        from core.services import ServiceManager
+        svc = ServiceManager()
+        return jsonify(svc.status())
+
+    @app.route("/api/services/<name>/<action>", methods=["POST"])
+    def api_service_action(name, action):
+        from core.services import ServiceManager
+        svc = ServiceManager()
+        if action == "start":
+            return jsonify(svc.start(name))
+        elif action == "stop":
+            return jsonify(svc.stop(name))
+        elif action == "restart":
+            return jsonify(svc.restart(name))
+        elif action == "logs":
+            tail = request.args.get("tail", 50, type=int)
+            return svc.logs(name, tail), 200, {"Content-Type": "text/plain"}
+        return jsonify({"error": f"Unknown action: {action}"}), 400
+
+    @app.route("/api/health")
+    def api_health():
+        from core.services import ServiceManager
+        svc = ServiceManager()
+        return jsonify(svc.health())
+
     @app.route("/api/config")
     def api_config():
         return jsonify(config.data)

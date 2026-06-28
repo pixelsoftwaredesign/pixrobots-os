@@ -441,6 +441,65 @@ def cmd_predict(args):
     PredictorCLI.handle(args)
 
 
+def cmd_service(args):
+    """Gestion centralisee de tous les services PixelOS."""
+    from core.services import ServiceManager
+    svc = ServiceManager()
+
+    if args.action == "status":
+        if args.json:
+            print(json.dumps(svc.status(args.name), indent=2, ensure_ascii=False, default=str))
+        else:
+            print(svc.summary() if not args.name else "")
+            if args.name:
+                st = svc.status(args.name)
+                for s in st:
+                    icon = "RUN" if s["running"] else "STOP"
+                    print(f"  {s['name']:<23} [{icon}] {s.get('status', '')}")
+
+    elif args.action == "start":
+        res = svc.start(args.name)
+        if args.json:
+            print(json.dumps(res, indent=2))
+        else:
+            if args.name:
+                print(f"  {res['status']}: {args.name}")
+            else:
+                for k, v in res.get("results", {}).items():
+                    print(f"  {v['status']}: {k}")
+
+    elif args.action == "stop":
+        res = svc.stop(args.name)
+        if args.json:
+            print(json.dumps(res, indent=2))
+        else:
+            if res.get("status") == "ok":
+                print(f"  Arrete: {args.name or 'tous les services'}")
+
+    elif args.action == "restart":
+        print("  Redemarrage en cours...")
+        res = svc.restart(args.name)
+        if args.json:
+            print(json.dumps(res, indent=2))
+        else:
+            print(f"  {res.get('status', 'ok')}: {args.name or 'tous les services'}")
+
+    elif args.action == "logs":
+        name = args.name or "pixelos-web"
+        log_text = svc.logs(name, args.tail)
+        print(log_text)
+
+    elif args.action == "health":
+        h = svc.health()
+        if args.json:
+            print(json.dumps(h, indent=2))
+        else:
+            print(f"\n  Sante PixelOS: {h['running']}/{h['total']} services en marche\n")
+            for s in h["services"]:
+                icon = "OK" if s["running"] else "KO"
+                print(f"  [{icon}] {s['name']:<25} port {s['port']}")
+
+
 def cmd_config(args):
     """Gestion de la configuration."""
     if args.action == "show":
@@ -597,6 +656,15 @@ def main():
     p.add_argument("--besoin-eau", help="besoin_eau (faible, moyen, eleve)")
     p.add_argument("--json", action="store_true", help="Sortie JSON brute")
     p.set_defaults(func=cmd_plante)
+
+    # service
+    p = sub.add_parser("service", help="Gestion des services PixelOS")
+    p.add_argument("action", choices=["status", "start", "stop", "restart", "logs", "health"])
+    p.add_argument("name", nargs="?", default=None,
+                   help="Service: mysql, mongodb, mosquitto, backend, dashboard, pixelos-web, all")
+    p.add_argument("--tail", type=int, default=50, help="Nombre de lignes de logs")
+    p.add_argument("--json", action="store_true", help="Sortie JSON")
+    p.set_defaults(func=cmd_service)
 
     # config
     p = sub.add_parser("config", help="Configuration")
