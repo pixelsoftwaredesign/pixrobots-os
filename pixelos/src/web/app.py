@@ -326,6 +326,78 @@ if HAS_FLASK:
 
     # ── Programmes : Text / Audio / Video ──────────────────
 
+    @app.route("/tasks")
+    def tasks_page():
+        return render_template("tasks.html", title="Taches")
+
+    @app.route("/api/tasks", methods=["GET"])
+    def api_tasks_list():
+        from core.tasks import TaskManager
+        tm = TaskManager()
+        q = request.args.get("q")
+        status = request.args.get("status")
+        cat = request.args.get("categorie")
+        prio = request.args.get("priorite")
+        zone = request.args.get("zone")
+        if q or status or cat or prio or zone:
+            return jsonify(tm.search(q, status, cat, prio, zone))
+        return jsonify(tm.all())
+
+    @app.route("/api/tasks", methods=["POST"])
+    def api_task_create():
+        from core.tasks import TaskManager
+        data = request.get_json()
+        if not data or not data.get("title"):
+            return jsonify({"error": "title required"}), 400
+        tm = TaskManager()
+        t = tm.create(data["title"], data.get("description", ""),
+                      data.get("categorie", "autre"),
+                      data.get("priorite", "medium"),
+                      data.get("echeance"), data.get("assigne", ""),
+                      data.get("zone", ""), data.get("plante", ""))
+        return jsonify(t), 201
+
+    @app.route("/api/tasks/<task_id>", methods=["GET"])
+    def api_task_get(task_id):
+        from core.tasks import TaskManager
+        tm = TaskManager()
+        t = tm.get(task_id)
+        if not t:
+            return jsonify({"error": "not found"}), 404
+        return jsonify(t)
+
+    @app.route("/api/tasks/<task_id>", methods=["PUT"])
+    def api_task_update(task_id):
+        from core.tasks import TaskManager
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "no data"}), 400
+        tm = TaskManager()
+        t = tm.update(task_id, **data)
+        if not t:
+            return jsonify({"error": "not found"}), 404
+        return jsonify(t)
+
+    @app.route("/api/tasks/<task_id>", methods=["DELETE"])
+    def api_task_delete(task_id):
+        from core.tasks import TaskManager
+        tm = TaskManager()
+        if tm.delete(task_id):
+            return jsonify({"status": "deleted"})
+        return jsonify({"error": "not found"}), 404
+
+    @app.route("/api/tasks/stats", methods=["GET"])
+    def api_tasks_stats():
+        from core.tasks import TaskManager
+        tm = TaskManager()
+        return jsonify(tm.stats())
+
+    @app.route("/api/tasks/board", methods=["GET"])
+    def api_tasks_board():
+        from core.tasks import TaskManager
+        tm = TaskManager()
+        return jsonify(tm.list_by_status())
+
     @app.route("/programs/text")
     def programs_text_page():
         return render_template("text.html", title="Notes")

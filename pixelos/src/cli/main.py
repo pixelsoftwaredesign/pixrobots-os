@@ -525,6 +525,90 @@ def cmd_service(args):
                     print("  -> pixelos service autostart install")
 
 
+def cmd_tasks(args):
+    """Gestion des taches agricoles."""
+    from core.tasks import TaskManager
+    tm = TaskManager()
+
+    if args.action == "list":
+        tasks = tm.search(args.query, args.status, args.categorie,
+                          args.priorite, args.zone)
+        if args.json:
+            print(json.dumps(tasks, indent=2, ensure_ascii=False))
+            return
+        if not tasks:
+            print("  Aucune tache")
+            return
+        print(f"\n{'ID':<10} {'Titre':<30} {'Status':<14} {'Prio':<8} {'Echeance':<12} {'Categorie'}")
+        print("-" * 90)
+        for t in tasks:
+            s = {"todo":"A faire","in_progress":"En cours","done":"Terminee","cancelled":"Annulee"}.get(t["status"], t["status"])
+            d = (t.get("echeance") or "")[:10]
+            print(f"{t['id']:<10} {t['title']:<30} {s:<14} {t.get('priorite',''):<8} {d:<12} {t.get('categorie','')}")
+
+    elif args.action == "show":
+        t = tm.get(args.task_id)
+        if not t:
+            print(f"Tache {args.task_id} introuvable")
+            return
+        if args.json:
+            print(json.dumps(t, indent=2, ensure_ascii=False))
+            return
+        print(f"\n=== {t['title']} ===")
+        print(f"  ID        : {t['id']}")
+        print(f"  Status    : {t['status']}")
+        print(f"  Priorite  : {t.get('priorite','medium')}")
+        print(f"  Categorie : {t.get('categorie','autre')}")
+        print(f"  Echeance  : {t.get('echeance','-')}")
+        print(f"  Assigne   : {t.get('assigne','-')}")
+        print(f"  Zone      : {t.get('zone','-')}")
+        print(f"  Plante    : {t.get('plante','-')}")
+        print(f"\n  {t.get('description','')}")
+
+    elif args.action == "create":
+        t = tm.create(args.title, args.description or "",
+                      args.categorie or "autre", args.priorite or "medium",
+                      args.echeance, args.assigne or "",
+                      args.zone or "", args.plante or "")
+        print(f"  Tache creee: {t['id']} - {t['title']}")
+
+    elif args.action == "edit":
+        kwargs = {}
+        for k in ("title","description","categorie","priorite",
+                  "status","echeance","assigne","zone","plante"):
+            v = getattr(args, k, None)
+            if v is not None:
+                kwargs[k] = v
+        t = tm.update(args.task_id, **kwargs)
+        if t:
+            print(f"  Tache mise a jour: {t['id']}")
+        else:
+            print(f"  Tache {args.task_id} introuvable")
+
+    elif args.action == "delete":
+        if tm.delete(args.task_id):
+            print(f"  Tache supprimee: {args.task_id}")
+        else:
+            print(f"  Tache {args.task_id} introuvable")
+
+    elif args.action == "stats":
+        s = tm.stats()
+        if args.json:
+            print(json.dumps(s, indent=2))
+            return
+        print(f"\n  Total     : {s['total']}")
+        print(f"  A faire   : {s['todo']}")
+        print(f"  En cours  : {s['in_progress']}")
+        print(f"  Terminees : {s['done']}")
+        print(f"  Annulees  : {s['cancelled']}")
+        print(f"  Urgentes  : {s['urgent']}")
+        print(f"  En retard : {s['en_retard']}")
+        print(f"\n  Par categorie:")
+        for cat, count in s["categories"].items():
+            if count > 0:
+                print(f"    {cat}: {count}")
+
+
 def cmd_program(args):
     """Programmes PixelOS : Text, Audio, Video."""
     from core.programs import ProgramManager
@@ -792,6 +876,24 @@ def main():
     p.add_argument("--tail", type=int, default=50, help="Nombre de lignes de logs")
     p.add_argument("--json", action="store_true", help="Sortie JSON")
     p.set_defaults(func=cmd_service)
+
+    # tasks
+    p = sub.add_parser("task", help="Gestion des taches agricoles")
+    p.add_argument("action", choices=["list", "show", "create", "edit",
+                                      "delete", "stats"])
+    p.add_argument("task_id", nargs="?", help="ID de la tache")
+    p.add_argument("--title", "-t", help="Titre de la tache")
+    p.add_argument("--description", "-d", help="Description")
+    p.add_argument("--categorie", "-c", help="Categorie (plantation, irrigation, recolte, traitement, maintenance, observation, administration, autre)")
+    p.add_argument("--priorite", "-p", help="Priorite (low, medium, high, urgent)")
+    p.add_argument("--status", "-s", help="Statut (todo, in_progress, done, cancelled)")
+    p.add_argument("--echeance", "-e", help="Echeance (YYYY-MM-DD)")
+    p.add_argument("--assigne", "-a", help="Personne assignee")
+    p.add_argument("--zone", "-z", help="Zone agricole")
+    p.add_argument("--plante", help="Plante associee")
+    p.add_argument("--query", "-q", help="Recherche")
+    p.add_argument("--json", action="store_true", help="Sortie JSON brute")
+    p.set_defaults(func=cmd_tasks)
 
     # program
     p = sub.add_parser("program", help="Programmes Text/Audio/Video")

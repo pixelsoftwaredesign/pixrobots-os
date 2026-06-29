@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+{% block title %}Taches - PixelOS{% endblock %}
+{% block content %}
+<style>
+.kanban-board { display: flex; gap: 16px; overflow-x: auto; min-height: calc(100vh - 140px); padding-bottom: 20px; }
+.kanban-col {
+  min-width: 280px; max-width: 320px; flex: 1;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px; display: flex; flex-direction: column;
+}
+.kanban-col .col-header {
+  font-size: 13px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; padding-bottom: 12px; border-bottom: 1px solid var(--border);
+  margin-bottom: 12px; display: flex; justify-content: space-between;
+}
+.kanban-col .col-count {
+  font-size: 12px; color: var(--text-dim); font-weight: 400;
+}
+.kanban-col .col-body { flex: 1; overflow-y: auto; }
+.task-card {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 6px; padding: 12px; margin-bottom: 8px;
+  cursor: pointer; transition: 0.15s; position: relative;
+}
+.task-card:hover { border-color: var(--blue); }
+.task-card .task-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.task-card .task-meta { font-size: 11px; color: var(--text-dim); display: flex; gap: 8px; flex-wrap: wrap; }
+.task-card .task-desc { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+.prio-low { border-left: 3px solid var(--blue); }
+.prio-medium { border-left: 3px solid var(--orange); }
+.prio-high { border-left: 3px solid var(--red); }
+.prio-urgent { border-left: 3px solid var(--red); background: rgba(248,81,73,0.05); }
+.tag {
+  display: inline-block; padding: 1px 6px; border-radius: 8px;
+  font-size: 10px; font-weight: 600;
+}
+.tag.plantation { background: rgba(63,185,80,0.15); color: var(--green); }
+.tag.irrigation { background: rgba(88,166,255,0.15); color: var(--blue); }
+.tag.recolte { background: rgba(210,153,34,0.15); color: var(--orange); }
+.tag.traitement { background: rgba(248,81,73,0.15); color: var(--red); }
+.tag.maintenance { background: rgba(139,148,158,0.15); color: var(--text-dim); }
+.tag.observation { background: rgba(46,160,67,0.15); color: var(--green); }
+.tag.administration { background: rgba(139,148,158,0.15); color: var(--text-dim); }
+.tag.autre { background: rgba(139,148,158,0.15); color: var(--text-dim); }
+.overdue { color: var(--red) !important; font-weight: 700; }
+.stats-bar {
+  display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;
+}
+.stat-pill {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 20px; padding: 6px 16px; font-size: 13px;
+  display: flex; align-items: center; gap: 6px;
+}
+.stat-pill .num { font-weight: 700; }
+.stat-pill.todo .num { color: var(--text-dim); }
+.stat-pill.in_progress .num { color: var(--blue); }
+.stat-pill.done .num { color: var(--green); }
+.stat-pill.urgent .num { color: var(--red); }
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  z-index: 100; align-items: center; justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 24px; width: 520px; max-width: 90vw;
+  max-height: 90vh; overflow-y: auto;
+}
+.modal h2 { font-size: 18px; margin-bottom: 16px; }
+.modal label { display: block; font-size: 12px; color: var(--text-dim); margin: 12px 0 4px; text-transform: uppercase; letter-spacing: 0.3px; }
+.modal input, .modal select, .modal textarea {
+  width: 100%; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px; font-size: 14px;
+}
+.modal textarea { min-height: 80px; resize: vertical; }
+.modal .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+</style>
+
+<div class="stats-bar" id="statsBar"></div>
+
+<div class="toolbar">
+  <button class="btn-green" onclick="openCreate()">+ Tache</button>
+  <input type="text" id="searchInput" placeholder="Rechercher..." style="width:200px" oninput="filterBoard()">
+  <select id="filterCategorie" onchange="filterBoard()">
+    <option value="">Toutes categories</option>
+    <option value="plantation">Plantation</option>
+    <option value="irrigation">Irrigation</option>
+    <option value="recolte">Recolte</option>
+    <option value="traitement">Traitement</option>
+    <option value="maintenance">Maintenance</option>
+    <option value="observation">Observation</option>
+    <option value="administration">Administration</option>
+    <option value="autre">Autre</option>
+  </select>
+</div>
+
+<div class="kanban-board" id="kanbanBoard"></div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2 id="modalTitle">Nouvelle tache</h2>
+    <input type="hidden" id="taskId">
+    <label>Titre</label>
+    <input type="text" id="fTitle" placeholder="Titre de la tache">
+    <label>Description</label>
+    <textarea id="fDesc" placeholder="Description..."></textarea>
+    <label>Categorie</label>
+    <select id="fCat">
+      <option value="plantation">Plantation</option>
+      <option value="irrigation">Irrigation</option>
+      <option value="recolte">Recolte</option>
+      <option value="traitement">Traitement</option>
+      <option value="maintenance">Maintenance</option>
+      <option value="observation">Observation</option>
+      <option value="administration">Administration</option>
+      <option value="autre">Autre</option>
+    </select>
+    <label>Priorite</label>
+    <select id="fPrio">
+      <option value="low">Basse</option>
+      <option value="medium" selected>Moyenne</option>
+      <option value="high">Haute</option>
+      <option value="urgent">Urgente</option>
+    </select>
+    <label>Statut</label>
+    <select id="fStatus">
+      <option value="todo">A faire</option>
+      <option value="in_progress">En cours</option>
+      <option value="done">Terminee</option>
+      <option value="cancelled">Annulee</option>
+    </select>
+    <label>Echeance</label>
+    <input type="date" id="fDate">
+    <label>Assigne a</label>
+    <input type="text" id="fAssigne" placeholder="Nom de la personne">
+    <label>Zone</label>
+    <input type="text" id="fZone" placeholder="Zone agricole">
+    <label>Plante</label>
+    <input type="text" id="fPlante" placeholder="Plante associee">
+    <div class="modal-actions">
+      <button class="btn-blue" id="saveBtn" onclick="saveTask()">Enregistrer</button>
+      <button class="btn-red" id="deleteBtn" onclick="deleteTask()" style="display:none">Supprimer</button>
+      <button onclick="closeModal()">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let tasks = [];
+let currentStatusFilter = null;
+
+async function loadBoard() {
+  const r = await fetch('/api/tasks/board');
+  const board = await r.json();
+  const stats = await (await fetch('/api/tasks/stats')).json();
+  tasks = Object.values(board).flat();
+  renderBoard(board, stats);
+}
+
+function renderBoard(board, stats) {
+  // Stats bar
+  document.getElementById('statsBar').innerHTML = `
+    <span class="stat-pill"><span class="num">${stats.total}</span> Total</span>
+    <span class="stat-pill todo"><span class="num">${stats.todo}</span> A faire</span>
+    <span class="stat-pill in_progress"><span class="num">${stats.in_progress}</span> En cours</span>
+    <span class="stat-pill done"><span class="num">${stats.done}</span> Terminees</span>
+    <span class="stat-pill urgent"><span class="num">${stats.urgent}</span> Urgentes</span>
+    ${stats.en_retard > 0 ? `<span class="stat-pill" style="border-color:var(--red)"><span class="num" style="color:var(--red)">${stats.en_retard}</span> En retard</span>` : ''}
+  `;
+
+  // Kanban columns
+  const order = ['todo', 'in_progress', 'done', 'cancelled'];
+  const labels = {'todo':'A faire','in_progress':'En cours','done':'Terminees','cancelled':'Annulees'};
+  const colors = {'todo':'var(--text-dim)','in_progress':'var(--blue)','done':'var(--green)','cancelled':'var(--text-dim)'};
+  const filter = document.getElementById('filterCategorie').value;
+  const search = document.getElementById('searchInput').value.toLowerCase();
+
+  document.getElementById('kanbanBoard').innerHTML = order.map(status => {
+    let items = board[status] || [];
+    if (filter) items = items.filter(t => t.categorie === filter);
+    if (search) items = items.filter(t => t.title.toLowerCase().includes(search) || (t.description || '').toLowerCase().includes(search));
+
+    return `<div class="kanban-col">
+      <div class="col-header" style="color:${colors[status]}">
+        ${labels[status]} <span class="col-count">${items.length}</span>
+      </div>
+      <div class="col-body">
+        ${items.map(t => renderCard(t)).join('')}
+        ${items.length === 0 ? '<div style="text-align:center;padding:30px;color:var(--text-dim);font-size:13px">Aucune tache</div>' : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderCard(t) {
+  const overdue = t.echeance && t.echeance < new Date().toISOString().split('T')[0] && t.status !== 'done' && t.status !== 'cancelled';
+  const dateStr = t.echeance ? new Date(t.echeance+'T00:00:00').toLocaleDateString('fr-FR', {day:'numeric',month:'short'}) : '';
+  const catClass = t.categorie || 'autre';
+  const prioClass = 'prio-' + (t.priorite || 'medium');
+  return `<div class="task-card ${prioClass}" onclick="openEdit('${t.id}')">
+    <div class="task-title">${escHtml(t.title)}</div>
+    ${t.description ? `<div class="task-desc">${escHtml(t.description.substring(0,80))}${t.description.length>80?'...':''}</div>` : ''}
+    <div class="task-meta">
+      ${t.categorie ? `<span class="tag ${catClass}">${catClass}</span>` : ''}
+      ${t.echeance ? `<span class="${overdue?'overdue':''}">${dateStr}</span>` : ''}
+      ${t.assigne ? `<span>${escHtml(t.assigne)}</span>` : ''}
+      ${t.zone ? `<span>${escHtml(t.zone)}</span>` : ''}
+      ${t.plante ? `<span>${escHtml(t.plante)}</span>` : ''}
+    </div>
+  </div>`;
+}
+
+function openCreate() {
+  document.getElementById('modalTitle').textContent = 'Nouvelle tache';
+  document.getElementById('taskId').value = '';
+  document.getElementById('fTitle').value = '';
+  document.getElementById('fDesc').value = '';
+  document.getElementById('fCat').value = 'autre';
+  document.getElementById('fPrio').value = 'medium';
+  document.getElementById('fStatus').value = 'todo';
+  document.getElementById('fDate').value = '';
+  document.getElementById('fAssigne').value = '';
+  document.getElementById('fZone').value = '';
+  document.getElementById('fPlante').value = '';
+  document.getElementById('deleteBtn').style.display = 'none';
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+async function openEdit(id) {
+  const r = await fetch('/api/tasks/' + id);
+  const t = await r.json();
+  document.getElementById('modalTitle').textContent = 'Modifier la tache';
+  document.getElementById('taskId').value = t.id;
+  document.getElementById('fTitle').value = t.title;
+  document.getElementById('fDesc').value = t.description || '';
+  document.getElementById('fCat').value = t.categorie || 'autre';
+  document.getElementById('fPrio').value = t.priorite || 'medium';
+  document.getElementById('fStatus').value = t.status || 'todo';
+  document.getElementById('fDate').value = t.echeance || '';
+  document.getElementById('fAssigne').value = t.assigne || '';
+  document.getElementById('fZone').value = t.zone || '';
+  document.getElementById('fPlante').value = t.plante || '';
+  document.getElementById('deleteBtn').style.display = 'inline-block';
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+
+async function saveTask() {
+  const id = document.getElementById('taskId').value;
+  const data = {
+    title: document.getElementById('fTitle').value.trim(),
+    description: document.getElementById('fDesc').value,
+    categorie: document.getElementById('fCat').value,
+    priorite: document.getElementById('fPrio').value,
+    status: document.getElementById('fStatus').value,
+    echeance: document.getElementById('fDate').value || null,
+    assigne: document.getElementById('fAssigne').value,
+    zone: document.getElementById('fZone').value,
+    plante: document.getElementById('fPlante').value,
+  };
+  if (!data.title) return alert('Titre requis');
+
+  const url = id ? `/api/tasks/${id}` : '/api/tasks';
+  const method = id ? 'PUT' : 'POST';
+  const r = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)});
+  if (r.ok) { closeModal(); loadBoard(); }
+  else alert('Erreur sauvegarde');
+}
+
+async function deleteTask() {
+  const id = document.getElementById('taskId').value;
+  if (!id || !confirm('Supprimer cette tache ?')) return;
+  const r = await fetch('/api/tasks/' + id, {method:'DELETE'});
+  if (r.ok) { closeModal(); loadBoard(); }
+}
+
+function filterBoard() {
+  const board = {todo:[], in_progress:[], done:[], cancelled:[]};
+  const filter = document.getElementById('filterCategorie').value;
+  const search = document.getElementById('searchInput').value.toLowerCase();
+
+  // Re-filter from all tasks
+  const order = ['todo','in_progress','done','cancelled'];
+  order.forEach(s => {
+    board[s] = tasks.filter(t => t.status === s);
+    if (filter) board[s] = board[s].filter(t => t.categorie === filter);
+    if (search) board[s] = board[s].filter(t => t.title.toLowerCase().includes(search) || (t.description||'').toLowerCase().includes(search));
+  });
+
+  const labels = {'todo':'A faire','in_progress':'En cours','done':'Terminees','cancelled':'Annulees'};
+  const colors = {'todo':'var(--text-dim)','in_progress':'var(--blue)','done':'var(--green)','cancelled':'var(--text-dim)'};
+
+  document.getElementById('kanbanBoard').innerHTML = order.map(status => {
+    const items = board[status] || [];
+    return `<div class="kanban-col">
+      <div class="col-header" style="color:${colors[status]}">
+        ${labels[status]} <span class="col-count">${items.length}</span>
+      </div>
+      <div class="col-body">
+        ${items.map(t => renderCard(t)).join('')}
+        ${items.length === 0 ? '<div style="text-align:center;padding:30px;color:var(--text-dim);font-size:13px">Aucune tache</div>' : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+document.getElementById('modalOverlay').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+});
+
+loadBoard();
+</script>
+{% endblock %}
