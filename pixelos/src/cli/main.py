@@ -608,6 +608,20 @@ def cmd_tasks(args):
             if count > 0:
                 print(f"    {cat}: {count}")
 
+    elif args.action == "alerts":
+        alerts = tm.alerts()
+        if args.json:
+            print(json.dumps(alerts, indent=2))
+            return
+        if not alerts:
+            print("  Aucune alerte tache")
+            return
+        print(f"\n{'ID':<10} {'Titre':<30} {'Type':<10} {'Zone':<15} {'Echeance':<12}")
+        print("-" * 80)
+        for a in alerts:
+            d = (a.get("echeance") or "")[:10]
+            print(f"{a['id']:<10} {a['title']:<30} {a['type']:<10} {a.get('zone',''):<15} {d:<12}")
+
 
 def cmd_program(args):
     """Programmes PixelOS : Text, Audio, Video."""
@@ -880,7 +894,7 @@ def main():
     # tasks
     p = sub.add_parser("task", help="Gestion des taches agricoles")
     p.add_argument("action", choices=["list", "show", "create", "edit",
-                                      "delete", "stats"])
+                                      "delete", "stats", "alerts"])
     p.add_argument("task_id", nargs="?", help="ID de la tache")
     p.add_argument("--title", "-t", help="Titre de la tache")
     p.add_argument("--description", "-d", help="Description")

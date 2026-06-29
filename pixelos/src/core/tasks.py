@@ -134,3 +134,49 @@ class TaskManager:
     def list_by_status(self) -> dict[str, list[dict]]:
         tasks = self.all()
         return {s: [t for t in tasks if t["status"] == s] for s in STATUSES}
+
+    def urgent(self) -> list[dict]:
+        """Taches urgentes non terminees."""
+        today = date.today().isoformat()
+        return [t for t in self.all()
+                if t["status"] not in ("done", "cancelled")
+                and (t["priorite"] == "urgent"
+                     or (t.get("echeance") and t["echeance"] <= today))]
+
+    def overdue(self) -> list[dict]:
+        """Taches en retard (echeance passee, non terminees)."""
+        today = date.today().isoformat()
+        return [t for t in self.all()
+                if t.get("echeance") and t["echeance"] < today
+                and t["status"] not in ("done", "cancelled")]
+
+    def due_soon(self, hours: int = 24) -> list[dict]:
+        """Taches dont l'echeance approche dans <hours> heures."""
+        from datetime import timedelta
+        seuil = (datetime.now() + timedelta(hours=hours)).strftime("%Y-%m-%d")
+        today = date.today().isoformat()
+        return [t for t in self.all()
+                if t.get("echeance") and t["echeance"] <= seuil
+                and t["echeance"] >= today
+                and t["status"] not in ("done", "cancelled")]
+
+    def alerts(self) -> list[dict]:
+        """Genere la liste des alertes taches actives."""
+        alerts = []
+        seen = set()
+        for t in self.urgent():
+            if t["id"] in seen:
+                continue
+            seen.add(t["id"])
+            overdue = t.get("echeance") and t["echeance"] < date.today().isoformat()
+            alerts.append({
+                "id": t["id"],
+                "title": t["title"],
+                "type": "overdue" if overdue else "urgent",
+                "priorite": t["priorite"],
+                "echeance": t.get("echeance"),
+                "categorie": t.get("categorie", ""),
+                "zone": t.get("zone", ""),
+                "plante": t.get("plante", ""),
+            })
+        return alerts

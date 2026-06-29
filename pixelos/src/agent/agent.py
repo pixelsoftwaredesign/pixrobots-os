@@ -83,6 +83,10 @@ class Agent:
                 # Vérification alertes locales
                 self._check_alerts(metrics)
 
+                # Surveillance des tâches urgentes (toutes les 5 minutes)
+                if int(time.time()) % 300 < self._interval:
+                    self._monitor_tasks()
+
                 time.sleep(self._interval)
 
             except Exception as e:
@@ -230,6 +234,41 @@ class Agent:
                 "value": disk,
                 "severity": "critical",
             })
+
+    def _monitor_tasks(self) -> None:
+        """Surveille les taches urgentes/retard et notifie via MQTT."""
+        try:
+            from core.tasks import TaskManager
+            tm = TaskManager()
+            alerts = tm.alerts()
+            if not alerts:
+                return
+
+            log.info("Alertes taches detectees", count=len(alerts))
+            self.mqtt.publish("pixelos/tasks/alert", {
+                "node": self.node_id,
+                "count": len(alerts),
+                "alerts": alerts,
+                "ts": datetime.now().isoformat(),
+            })
+
+            # Allouer plus de ressources si tache urgente liee a une zone
+            zones_urgentes = set(a["zone"] for a in alerts if a.get("zone"))
+            if zones_urgentes:
+                log.info("Zones avec taches urgentes", zones=list(zones_urgentes))
+                try:
+                    import psutil
+                    proc = psutil.Process()
+                    if hasattr(proc, "nice"):
+                        proc.nice(psutil.HIGH_PRIORITY_CLASS
+                                  if sys.platform == "win32" else -10)
+                        log.info("Priorite agent augmentee pour taches urgentes")
+                except Exception:
+                    pass
+        except ImportError:
+            pass
+        except Exception as e:
+            log.warning("Erreur surveillance taches", error=str(e))
 
     def _on_command(self, topic: str, payload: dict) -> None:
         """Exécute une commande reçue via MQTT."""

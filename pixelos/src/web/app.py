@@ -357,15 +357,6 @@ if HAS_FLASK:
                       data.get("zone", ""), data.get("plante", ""))
         return jsonify(t), 201
 
-    @app.route("/api/tasks/<task_id>", methods=["GET"])
-    def api_task_get(task_id):
-        from core.tasks import TaskManager
-        tm = TaskManager()
-        t = tm.get(task_id)
-        if not t:
-            return jsonify({"error": "not found"}), 404
-        return jsonify(t)
-
     @app.route("/api/tasks/<task_id>", methods=["PUT"])
     def api_task_update(task_id):
         from core.tasks import TaskManager
@@ -397,6 +388,21 @@ if HAS_FLASK:
         from core.tasks import TaskManager
         tm = TaskManager()
         return jsonify(tm.list_by_status())
+
+    @app.route("/api/tasks/alerts", methods=["GET"])
+    def api_tasks_alerts():
+        from core.tasks import TaskManager
+        tm = TaskManager()
+        return jsonify(tm.alerts())
+
+    @app.route("/api/tasks/<task_id>", methods=["GET"])
+    def api_task_get(task_id):
+        from core.tasks import TaskManager
+        tm = TaskManager()
+        t = tm.get(task_id)
+        if not t:
+            return jsonify({"error": "not found"}), 404
+        return jsonify(t)
 
     @app.route("/programs/text")
     def programs_text_page():
