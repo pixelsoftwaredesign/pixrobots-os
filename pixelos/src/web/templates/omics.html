@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Omics - PixelOS{% endblock %}
+{% block content %}
+<style>
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+.card h3 { font-size: 13px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.card .value { font-size: 28px; font-weight: 700; }
+.card .value.green { color: var(--green); }
+.card .value.blue { color: var(--blue); }
+.tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+.tab { padding: 10px 20px; cursor: pointer; font-size: 14px; color: var(--text-dim); border-bottom: 2px solid transparent; transition: 0.15s; }
+.tab.active { color: var(--text); border-bottom-color: var(--green); }
+.tab:hover { color: var(--text); }
+.panel { display: none; }
+.panel.active { display: block; }
+input, select, textarea { width: 100%; padding: 10px 12px; margin-bottom: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 14px; font-family: monospace; }
+label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.row { display: flex; gap: 12px; }
+.row > * { flex: 1; }
+.empty { color: var(--text-dim); text-align: center; padding: 40px 0; }
+table { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 8px; border-collapse: collapse; overflow: hidden; }
+th { text-align: left; padding: 10px 14px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); border-bottom: 1px solid var(--border); }
+td { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+tr:last-child td { border-bottom: none; }
+.result-box { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-top: 12px; font-family: monospace; font-size: 13px; white-space: pre-wrap; }
+</style>
+
+<div class="toolbar">
+  <h2 style="flex:1;font-size:20px;"><span>&#x1F9EC;</span> Bioinformatique</h2>
+  <button class="btn-blue" onclick="refreshAll()">&#x21bb;</button>
+</div>
+
+<div class="grid" id="statsGrid"></div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('genomes',this)">Génomes</div>
+  <div class="tab" onclick="switchTab('align',this)">Alignement</div>
+  <div class="tab" onclick="switchTab('diversity',this)">Diversité</div>
+</div>
+
+<div id="panel-genomes" class="panel active"><div class="empty">Chargement...</div></div>
+<div id="panel-align" class="panel">
+  <div class="card" style="max-width:600px;">
+    <h3 style="margin-bottom:12px;">Alignement de séquences</h3>
+    <label>Séquence 1</label><textarea id="seq1" rows="3" placeholder="ATCG..."></textarea>
+    <label>Séquence 2</label><textarea id="seq2" rows="3" placeholder="ATCG..."></textarea>
+    <button class="btn-green" onclick="runAlign()">Aligner</button>
+    <div id="alignResult"></div>
+  </div>
+</div>
+<div id="panel-diversity" class="panel">
+  <div class="card" style="max-width:600px;">
+    <h3 style="margin-bottom:12px;">Diversité alpha</h3>
+    <button class="btn-green" onclick="runDiversity()">Calculer</button>
+    <div id="divResult"></div>
+  </div>
+</div>
+
+<script>
+async function api(url, opts={}) {
+  const r = await fetch(url, { headers:{'Content-Type':'application/json'}, ...opts });
+  return r.json();
+}
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+  if (name === 'genomes') loadGenomes();
+}
+
+async function refreshAll() {
+  const [stats, genomes] = await Promise.all([api('/api/omics/stats'), api('/api/omics/genomes')]);
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="card"><h3>Génomes</h3><div class="value blue">${stats.total_genomes || 0}</div></div>
+    <div class="card"><h3>Espèces</h3><div class="value green">${stats.total_species || 0}</div></div>
+    <div class="card"><h3>Séquences</h3><div class="value">${stats.total_sequences || 0}</div></div>`;
+  loadGenomes();
+}
+
+async function loadGenomes() {
+  const data = await api('/api/omics/genomes');
+  const list = data.genomes || [];
+  document.getElementById('panel-genomes').innerHTML = list.length
+    ? `<table><tr><th>Espèce</th><th>Taille (pb)</th><th>GC%</th><th>Gènes</th><th>Version</th></tr>${
+        list.map(g => `<tr><td><strong>${g.species || '—'}</strong></td>
+          <td>${(g.size_bp || '').toLocaleString()}</td>
+          <td>${g.gc_content || '—'}</td>
+          <td>${g.gene_count || '—'}</td>
+          <td style="color:var(--text-dim);font-size:12px;">${g.version || '1.0'}</td></tr>`).join('')}</table>`
+    : '<div class="empty">Aucun génome référencé</div>';
+}
+
+async function runAlign() {
+  const seq1 = document.getElementById('seq1').value.trim();
+  const seq2 = document.getElementById('seq2').value.trim();
+  if (!seq1 || !seq2) { document.getElementById('alignResult').innerHTML = '<div class="result-box" style="color:var(--red);">Les deux séquences sont requises</div>'; return; }
+  const data = await api('/api/omics/align', { method:'POST', body:JSON.stringify({seq1, seq2}) });
+  document.getElementById('alignResult').innerHTML = `<div class="result-box">${JSON.stringify(data, null, 2)}</div>`;
+}
+
+async function runDiversity() {
+  const data = await api('/api/omics/diversity', { method:'POST', body:JSON.stringify({}) });
+  document.getElementById('divResult').innerHTML = `<div class="result-box">${JSON.stringify(data, null, 2)}</div>`;
+}
+
+refreshAll();
+</script>
+{% endblock %}

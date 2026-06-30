@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Vision - PixelOS{% endblock %}
+{% block content %}
+<style>
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+.card h3 { font-size: 13px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.card .value { font-size: 28px; font-weight: 700; }
+.card .value.green { color: var(--green); }
+.tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+.tab { padding: 10px 20px; cursor: pointer; font-size: 14px; color: var(--text-dim); border-bottom: 2px solid transparent; transition: 0.15s; }
+.tab.active { color: var(--text); border-bottom-color: var(--green); }
+.tab:hover { color: var(--text); }
+.panel { display: none; }
+.panel.active { display: block; }
+input, select, textarea { width: 100%; padding: 10px 12px; margin-bottom: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 14px; }
+label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.row { display: flex; gap: 12px; }
+.row > * { flex: 1; }
+.empty { color: var(--text-dim); text-align: center; padding: 40px 0; }
+.result-box { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-top: 12px; font-family: monospace; font-size: 13px; white-space: pre-wrap; max-height: 400px; overflow: auto; }
+</style>
+
+<div class="toolbar">
+  <h2 style="flex:1;font-size:20px;"><span>&#x1F4F7;</span> Vision par ordinateur</h2>
+  <button class="btn-blue" onclick="refreshAll()">&#x21bb;</button>
+</div>
+
+<div class="grid" id="statsGrid"></div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('segment',this)">Analyse plante</div>
+  <div class="tab" onclick="switchTab('ndvi',this)">NDVI</div>
+  <div class="tab" onclick="switchTab('disease',this)">Maladies</div>
+  <div class="tab" onclick="switchTab('root',this)">Racines</div>
+</div>
+
+<div id="panel-segment" class="panel active">
+  <div class="card" style="max-width:600px;">
+    <h3 style="margin-bottom:12px;">Analyser une plante</h3>
+    <label>Chemin de l'image</label><input id="segPath" placeholder="/data/images/plante_001.jpg">
+    <button class="btn-green" onclick="runSegment()">Analyser</button>
+    <div id="segResult"></div>
+  </div>
+</div>
+<div id="panel-ndvi" class="panel">
+  <div class="card" style="max-width:600px;">
+    <h3 style="margin-bottom:12px;">Calcul NDVI</h3>
+    <div class="row"><div><label>Image NIR</label><input id="ndviNir" placeholder="proche infrarouge"></div>
+    <div><label>Image Rouge</label><input id="ndviRed" placeholder="rouge visible"></div></div>
+    <button class="btn-green" onclick="runNdvi()">Calculer NDVI</button>
+    <div id="ndviResult"></div>
+  </div>
+</div>
+<div id="panel-disease" class="panel">
+  <div class="card" style="max-width:600px;">
+    <h3 style="margin-bottom:12px;">Détection de maladies</h3>
+    <label>Chemin de l'image</label><input id="disPath" placeholder="/data/images/feuille_001.jpg">
+    <button class="btn-green" onclick="runDisease()">Détecter</button>
+    <div id="disResult"></div>
+  </div>
+</div>
+<div id="panel-root" class="panel">
+  <div class="card" style="max-width:600px;">
+    <h3 style="margin-bottom:12px;">Analyse racinaire</h3>
+    <label>Chemin de l'image</label><input id="rootPath" placeholder="/data/images/racine_001.jpg">
+    <button class="btn-green" onclick="runRoot()">Analyser</button>
+    <div id="rootResult"></div>
+  </div>
+</div>
+
+<script>
+async function api(url, opts={}) {
+  const r = await fetch(url, { headers:{'Content-Type':'application/json'}, ...opts });
+  return r.json();
+}
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+}
+
+async function refreshAll() {
+  const stats = await api('/api/vision/stats');
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="card"><h3>Analyses</h3><div class="value green">${stats.total_analyses || 0}</div></div>
+    <div class="card"><h3>Maladies détectées</h3><div class="value" style="color:var(--orange);">${stats.total_diseases || 0}</div></div>
+    <div class="card"><h3>NDVI moyen</h3><div class="value blue">${stats.avg_ndvi || '—'}</div></div>`;
+}
+
+async function runSegment() {
+  const image = document.getElementById('segPath').value.trim();
+  if (!image) { document.getElementById('segResult').innerHTML = '<div class="result-box" style="color:var(--red);">Chemin requis</div>'; return; }
+  const data = await api('/api/vision/segment', { method:'POST', body:JSON.stringify({image}) });
+  document.getElementById('segResult').innerHTML = `<div class="result-box">${JSON.stringify(data, null, 2)}</div>`;
+}
+
+async function runNdvi() {
+  const nir = document.getElementById('ndviNir').value.trim();
+  const red = document.getElementById('ndviRed').value.trim();
+  if (!nir || !red) { document.getElementById('ndviResult').innerHTML = '<div class="result-box" style="color:var(--red);">NIR et Rouge requis</div>'; return; }
+  const data = await api('/api/vision/ndvi', { method:'POST', body:JSON.stringify({nir, red}) });
+  document.getElementById('ndviResult').innerHTML = `<div class="result-box">${JSON.stringify(data, null, 2)}</div>`;
+}
+
+async function runDisease() {
+  const image = document.getElementById('disPath').value.trim();
+  if (!image) { document.getElementById('disResult').innerHTML = '<div class="result-box" style="color:var(--red);">Chemin requis</div>'; return; }
+  const data = await api('/api/vision/disease', { method:'POST', body:JSON.stringify({image}) });
+  document.getElementById('disResult').innerHTML = `<div class="result-box">${JSON.stringify(data, null, 2)}</div>`;
+}
+
+async function runRoot() {
+  const image = document.getElementById('rootPath').value.trim();
+  if (!image) { document.getElementById('rootResult').innerHTML = '<div class="result-box" style="color:var(--red);">Chemin requis</div>'; return; }
+  const data = await api('/api/vision/root', { method:'POST', body:JSON.stringify({image}) });
+  document.getElementById('rootResult').innerHTML = `<div class="result-box">${JSON.stringify(data, null, 2)}</div>`;
+}
+
+refreshAll();
+</script>
+{% endblock %}

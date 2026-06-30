@@ -1,0 +1,499 @@
+{% extends "base.html" %}
+{% block title %}Pixel Wallet{% endblock %}
+{% block content %}
+<style>
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+  .card h3 { font-size: 14px; color: var(--text-dim); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .card .value { font-size: 28px; font-weight: 700; }
+  .card .value.green { color: var(--green); }
+  .card .sub { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+  .wallet-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .wallet-row:last-child { border-bottom: none; }
+  .wallet-addr { font-family: monospace; font-size: 13px; color: var(--blue); }
+  .wallet-bal { font-weight: 600; font-size: 15px; }
+  .wallet-bal small { color: var(--text-dim); font-weight: 400; }
+  .wallet-tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: rgba(88,166,255,0.15); color: var(--blue); }
+  .wallet-tag.default { background: rgba(63,185,80,0.15); color: var(--green); }
+  input, select, textarea { width: 100%; padding: 10px 12px; margin-bottom: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 14px; font-family: inherit; }
+  label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .row { display: flex; gap: 12px; }
+  .row > * { flex: 1; }
+  .tx-item { padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .tx-item:last-child { border-bottom: none; }
+  .tx-item .tx-meta { display: flex; justify-content: space-between; color: var(--text-dim); font-size: 11px; margin-top: 4px; font-family: monospace; }
+  .tx-item .tx-amount { font-weight: 600; }
+  .tx-item .tx-amount.out { color: var(--red); }
+  .tx-item .tx-amount.in { color: var(--green); }
+  .tx-item .tx-memo { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; min-width: 360px; max-width: 480px; }
+  .modal h2 { margin-bottom: 16px; font-size: 18px; }
+  .tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .tab { padding: 10px 20px; cursor: pointer; font-size: 14px; color: var(--text-dim); border-bottom: 2px solid transparent; transition: 0.15s; }
+  .tab.active { color: var(--text); border-bottom-color: var(--green); }
+  .tab:hover { color: var(--text); }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  textarea.code { font-family: monospace; font-size: 12px; min-height: 80px; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 20px; font-size: 14px; z-index: 200; animation: fadeIn 0.3s; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .empty { color: var(--text-dim); text-align: center; padding: 40px 0; }
+  a.blue-link { color: var(--blue); cursor: pointer; text-decoration: none; }
+  a.blue-link:hover { text-decoration: underline; }
+</style>
+
+<div class="toolbar">
+  <h2 style="flex:1;font-size:20px;display:flex;align-items:center;gap:8px;">
+    <span>&#x1FA99;</span> Pixel Wallet <span style="font-size:12px;color:var(--text-dim);font-weight:400;">BITROOT (BRT)</span>
+    <span id="netBadge" style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(210,153,34,0.15);color:var(--orange);margin-left:8px;">Gnosis Chain</span>
+  </h2>
+  <button class="btn-blue" onclick="showModal('createWalletModal')">+ Nouveau</button>
+  <button class="btn-orange" onclick="showModal('importWalletModal')">Importer</button>
+  <button class="btn-green" onclick="refreshAll()">&#x21bb;</button>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('wallets',this)">Portefeuilles</div>
+  <div class="tab" onclick="switchTab('send',this)">Envoyer</div>
+  <div class="tab" onclick="switchTab('history',this)">Historique</div>
+  <div class="tab" onclick="switchTab('invoices',this)">Factures</div>
+  <div class="tab" onclick="switchTab('settings',this)">Paramètres</div>
+</div>
+
+<div id="panel-wallets" class="panel active">
+  <div class="grid">
+    <div class="card"><h3>Solde Total</h3><div class="value green" id="totalBalance">0</div><div class="sub">BRT</div></div>
+    <div class="card"><h3>Portefeuilles</h3><div class="value" id="walletCount">0</div><div class="sub">actifs</div></div>
+    <div class="card"><h3>Transactions</h3><div class="value" id="txCount">0</div><div class="sub">au total</div></div>
+  </div>
+  <div id="walletList"></div>
+</div>
+
+<div id="panel-send" class="panel">
+  <div class="card" style="max-width:500px;">
+    <h3 style="margin-bottom:12px;">Envoyer des BRT</h3>
+    <label>Depuis</label>
+    <select id="sendFrom"></select>
+    <label>Destinataire</label>
+    <input id="sendTo" placeholder="0x... ou @pixel:user">
+    <label>Montant (BRT)</label>
+    <input id="sendAmount" type="number" step="0.01" min="0" placeholder="0.00">
+    <label>Mémo</label>
+    <input id="sendMemo" placeholder="Paiement facture #...">
+    <div class="row">
+      <button class="btn-green" onclick="sendTransaction()">&#x27A4; Envoyer</button>
+      <button class="btn-orange" onclick="sendTransactionOffline()">&#x1F4E1; Hors-ligne</button>
+    </div>
+  </div>
+  <div id="txResult" style="margin-top:12px;display:none;"></div>
+</div>
+
+<div id="panel-history" class="panel">
+  <div class="toolbar">
+    <select id="historyFilter" style="width:auto;" onchange="loadHistory()">
+      <option value="">Tous</option>
+      <option value="vente">Vente</option>
+      <option value="achat">Achat</option>
+      <option value="facture">Facture</option>
+      <option value="transfert">Transfert</option>
+      <option value="autre">Autre</option>
+    </select>
+  </div>
+  <div id="historyList"><div class="empty">Aucune transaction</div></div>
+</div>
+
+<div id="panel-invoices" class="panel">
+  <div class="card" style="max-width:500px;margin-bottom:16px;">
+    <h3 style="margin-bottom:12px;">Créer une facture</h3>
+    <label>Destinataire</label>
+    <input id="invTo" placeholder="0x...">
+    <label>Montant (BRT)</label>
+    <input id="invAmount" type="number" step="0.01" min="0">
+    <label>Libellé</label>
+    <input id="invLabel" placeholder="Semences bio">
+    <label>Description</label>
+    <textarea id="invDesc" rows="2" placeholder="Description..."></textarea>
+    <label>Échéance</label>
+    <input id="invDue" type="date">
+    <button class="btn-green" onclick="createInvoice()">&#x1F4C4; Créer la facture</button>
+  </div>
+  <div id="invoiceList"></div>
+</div>
+
+<div id="panel-settings" class="panel">
+  <div class="card" style="max-width:500px;">
+    <h3 style="margin-bottom:12px;">Paramètres du wallet</h3>
+    <label>Taux de change BRT/EUR</label>
+    <div class="row">
+      <input id="rateInput" type="number" step="0.0001" min="0" style="margin-bottom:0;">
+      <button class="btn-blue" onclick="setRate()">Appliquer</button>
+    </div>
+    <div style="margin-top:16px;font-size:12px;color:var(--text-dim);">
+      <p>1 BRT = <span id="rateDisplay">0</span> EUR</p>
+    </div>
+    <hr style="border-color:var(--border);margin:16px 0;">
+    <label>RPC URL (Gnosis Chain)</label>
+    <input id="rpcUrl" value="https://rpc.gnosis.gateway.fm">
+    <div style="margin-top:8px;">
+      <button class="btn-red btn-sm" onclick="showModal('deleteWalletModal')">&#x1F5D1; Supprimer un portefeuille</button>
+    </div>
+  </div>
+</div>
+
+<div id="createWalletModal" class="modal-bg" style="display:none;" onclick="if(event.target===this)hideModal('createWalletModal')">
+  <div class="modal">
+    <h2>Nouveau portefeuille</h2>
+    <label>Libellé</label>
+    <input id="newWalletLabel" placeholder="Mon portefeuille principal">
+    <label>Mot de passe (chiffrement local)</label>
+    <input id="newWalletPass" type="password" value="pixelos_default">
+    <label><input id="newWalletDefault" type="checkbox" checked> Définir par défaut</label>
+    <div class="row">
+      <button class="btn-green" onclick="createWallet()">Créer</button>
+      <button class="btn-red" onclick="hideModal('createWalletModal')">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<div id="importWalletModal" class="modal-bg" style="display:none;" onclick="if(event.target===this)hideModal('importWalletModal')">
+  <div class="modal">
+    <h2>Importer une clé privée</h2>
+    <label>Clé privée</label>
+    <textarea id="importKey" class="code" placeholder="0x... (64 hex ou 0x-préfixe)"></textarea>
+    <label>Libellé</label>
+    <input id="importLabel" placeholder="Portefeuille importé">
+    <label>Mot de passe</label>
+    <input id="importPass" type="password" value="pixelos_default">
+    <label><input id="importDefault" type="checkbox"> Définir par défaut</label>
+    <div class="row">
+      <button class="btn-green" onclick="importWallet()">Importer</button>
+      <button class="btn-red" onclick="hideModal('importWalletModal')">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<div id="deleteWalletModal" class="modal-bg" style="display:none;" onclick="if(event.target===this)hideModal('deleteWalletModal')">
+  <div class="modal">
+    <h2>Supprimer un portefeuille</h2>
+    <select id="deleteWalletSelect"></select>
+    <div class="row">
+      <button class="btn-red" onclick="deleteWallet()">Supprimer</button>
+      <button class="btn-blue" onclick="hideModal('deleteWalletModal')">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<div id="detailModal" class="modal-bg" style="display:none;" onclick="if(event.target===this)hideModal('detailModal')">
+  <div class="modal" id="detailContent" style="min-width:420px;"></div>
+</div>
+
+<div id="toast" class="toast" style="display:none;"></div>
+
+<script>
+let wallets = [];
+let txHistory = [];
+let invoices = [];
+
+async function api(url, opts={}) {
+  const r = await fetch(url, { headers:{'Content-Type':'application/json'}, ...opts });
+  return r.json();
+}
+
+function toast(msg, color='var(--green)') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.borderLeftColor = color; t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3000);
+}
+
+function showModal(id) { document.getElementById(id).style.display = 'flex'; }
+function hideModal(id) { document.getElementById(id).style.display = 'none'; }
+
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+}
+
+async function refreshAll() {
+  await Promise.all([loadWallets(), loadHistory()]);
+  toast('Données actualisées');
+}
+
+// ── Wallets ──
+
+async function loadWallets() {
+  try {
+    const data = await api('/api/web3/wallet/list');
+    wallets = data.wallets || [];
+    renderWallets();
+    document.getElementById('totalBalance').textContent = data.total_balance_brt || 0;
+    document.getElementById('walletCount').textContent = wallets.length;
+
+    const sel = document.getElementById('sendFrom');
+    sel.innerHTML = wallets.map(w => `<option value="${w.address}">${w.label || w.address.slice(0,10)}... (${w.balance_brt} BRT)</option>`).join('');
+
+    const del = document.getElementById('deleteWalletSelect');
+    del.innerHTML = wallets.map(w => `<option value="${w.address}">${w.label || w.address.slice(0,10)}... (${w.balance_brt} BRT)</option>`).join('');
+  } catch(e) { console.error(e); }
+}
+
+function renderWallets() {
+  const container = document.getElementById('walletList');
+  if (!wallets.length) {
+    container.innerHTML = '<div class="empty">Aucun portefeuille. Créez-en un !</div>';
+    return;
+  }
+  container.innerHTML = wallets.map(w => `
+    <div class="wallet-row">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <strong>${w.label || 'Portefeuille'}</strong>
+          ${w.default ? '<span class="wallet-tag default">Principal</span>' : ''}
+          <span class="wallet-tag">${w.address.slice(0,6)}...${w.address.slice(-4)}</span>
+        </div>
+        <div class="wallet-addr">${w.address}</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="wallet-bal">${w.balance_brt} <small>BRT</small></div>
+        <div style="font-size:11px;color:var(--text-dim);">${(w.balance_brt * (rate || 1)).toFixed(4)} EUR</div>
+      </div>
+      <div style="display:flex;gap:4px;margin-left:12px;">
+        <button class="btn-blue btn-sm" onclick="viewDetails('${w.address}')">Détails</button>
+        <button class="btn-green btn-sm" onclick="setDefault('${w.address}')">Défaut</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function createWallet() {
+  const label = document.getElementById('newWalletLabel').value || 'Portefeuille';
+  const password = document.getElementById('newWalletPass').value;
+  const make_default = document.getElementById('newWalletDefault').checked;
+  await api('/api/web3/wallet/create', { method:'POST', body:JSON.stringify({label,password,make_default}) });
+  hideModal('createWalletModal');
+  toast('Portefeuille créé !');
+  loadWallets();
+}
+
+async function importWallet() {
+  const private_key = document.getElementById('importKey').value.trim();
+  const label = document.getElementById('importLabel').value || 'Importé';
+  const password = document.getElementById('importPass').value;
+  const make_default = document.getElementById('importDefault').checked;
+  if (!private_key) { toast('Clé privée requise', 'var(--red)'); return; }
+  const res = await api('/api/web3/wallet/import', { method:'POST', body:JSON.stringify({private_key,label,password,make_default}) });
+  if (res.error) { toast(res.error, 'var(--red)'); return; }
+  hideModal('importWalletModal');
+  toast('Portefeuille importé !');
+  loadWallets();
+}
+
+async function deleteWallet() {
+  const addr = document.getElementById('deleteWalletSelect').value;
+  await api('/api/web3/wallet/' + addr, { method:'DELETE' });
+  hideModal('deleteWalletModal');
+  toast('Portefeuille supprimé');
+  loadWallets();
+}
+
+async function setDefault(addr) {
+  await api('/api/web3/wallet/' + addr + '/default', { method:'POST' });
+  toast('Portefeuille principal mis à jour');
+  loadWallets();
+}
+
+async function viewDetails(addr) {
+  const w = await api('/api/web3/wallet/' + addr);
+  const txs = await api('/api/web3/tx/history?address=' + addr + '&limit=10');
+  const modal = document.getElementById('detailContent');
+  modal.innerHTML = `
+    <h2 style="margin-bottom:8px;">${w.label || 'Portefeuille'}</h2>
+    <p style="font-family:monospace;font-size:12px;color:var(--blue);margin-bottom:12px;word-break:break-all;">${w.address}</p>
+    <div class="grid" style="margin-bottom:12px;">
+      <div class="card"><h3>Solde</h3><div class="value green">${w.balance_brt}</div><div class="sub">BRT</div></div>
+      <div class="card"><h3>Wei</h3><div class="value">${w.balance_wei}</div><div class="sub">WEI</div></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <button class="btn-green btn-sm" onclick="setBalance('${addr}')">Définir solde</button>
+      <button class="btn-orange btn-sm" onclick="exportKey('${addr}')">Exporter clé</button>
+    </div>
+    <h3 style="font-size:14px;margin-bottom:8px;">Dernières transactions</h3>
+    ${(txs.transactions||[]).slice(0,10).map(tx => `
+      <div class="tx-item">
+        <div style="display:flex;justify-content:space-between;">
+          <span class="tx-amount ${tx.from === addr ? 'out' : 'in'}">${tx.from === addr ? '-' : '+'}${tx.value_brt} BRT</span>
+          <span style="font-size:11px;color:var(--text-dim);">${new Date(tx.timestamp).toLocaleDateString()}</span>
+        </div>
+        <div class="tx-meta">${tx.from.slice(0,10)}... → ${tx.to.slice(0,10)}...</div>
+        ${tx.memo ? `<div class="tx-memo">${tx.memo}</div>` : ''}
+      </div>
+    `).join('') || '<div class="empty">Aucune transaction</div>'}
+  `;
+  showModal('detailModal');
+}
+
+async function setBalance(addr) {
+  const brt = prompt('Nouveau solde BRT (mode local) :');
+  if (brt === null) return;
+  await api('/api/web3/wallet/' + addr + '/balance', { method:'PUT', body:JSON.stringify({balance_brt:parseFloat(brt)}) });
+  toast('Solde mis à jour');
+  hideModal('detailModal');
+  loadWallets();
+}
+
+async function exportKey(addr) {
+  const pass = prompt('Mot de passe :');
+  if (!pass) return;
+  const res = await api('/api/web3/wallet/' + addr + '/private-key', { method:'POST', body:JSON.stringify({password:pass}) });
+  if (res.error) { toast(res.error, 'var(--red)'); return; }
+  alert('CLÉ PRIVÉE - Ne jamais partager !\n\n' + res.private_key);
+}
+
+// ── Send ──
+
+async function sendTransaction() {
+  const from = document.getElementById('sendFrom').value;
+  const to = document.getElementById('sendTo').value;
+  const amount = parseFloat(document.getElementById('sendAmount').value);
+  const memo = document.getElementById('sendMemo').value;
+  if (!to || !amount) { toast('Destinataire et montant requis', 'var(--red)'); return; }
+  const res = await api('/api/web3/tx/create', { method:'POST', body:JSON.stringify({from, to, amount_brt:amount, memo}) });
+  document.getElementById('txResult').innerHTML = `
+    <div class="card" style="border-left:3px solid var(--green);">
+      <strong>Transaction créée</strong><br>
+      <span style="font-family:monospace;font-size:12px;color:var(--text-dim);">${res.tx_id}</span>
+    </div>`;
+  document.getElementById('txResult').style.display = 'block';
+  toast('Transaction créée !');
+  loadHistory();
+  loadWallets();
+}
+
+async function sendTransactionOffline() {
+  const to = document.getElementById('sendTo').value;
+  const amount = parseFloat(document.getElementById('sendAmount').value);
+  const memo = document.getElementById('sendMemo').value;
+  if (!to || !amount) { toast('Destinataire et montant requis', 'var(--red)'); return; }
+  const res = await api('/api/web3/tx/send-offline', { method:'POST', body:JSON.stringify({to, amount_brt:amount, memo}) });
+  if (res.error) { toast(res.error, 'var(--red)'); return; }
+  toast('Transaction hors-ligne créée');
+  loadHistory();
+}
+
+// ── History ──
+
+async function loadHistory() {
+  try {
+    const data = await api('/api/web3/tx/history?limit=100');
+    txHistory = data.transactions || [];
+    document.getElementById('txCount').textContent = txHistory.length;
+    renderHistory();
+    loadInvoices();
+  } catch(e) { console.error(e); }
+}
+
+function renderHistory() {
+  const filter = document.getElementById('historyFilter').value;
+  let list = txHistory;
+  if (filter) list = list.filter(tx => tx.category === filter);
+  const container = document.getElementById('historyList');
+  if (!list.length) {
+    container.innerHTML = '<div class="empty">Aucune transaction</div>';
+    return;
+  }
+  container.innerHTML = list.map(tx => `
+    <div class="tx-item">
+      <div style="display:flex;justify-content:space-between;">
+        <span class="tx-amount ${tx.from === (wallets.find(w=>w.default)?.address || '') ? 'out' : 'in'}">${tx.value_brt} BRT</span>
+        <span style="font-size:11px;color:var(--text-dim);">${new Date(tx.timestamp).toLocaleString()}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text-dim);margin-top:2px;">
+        ${tx.from.slice(0,8)}... → ${tx.to.slice(0,8)}... | ${tx.category}
+      </div>
+      ${tx.memo ? `<div class="tx-memo">${tx.memo}</div>` : ''}
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <span style="font-size:11px;font-family:monospace;color:var(--text-dim);">ID: ${tx.tx_id || tx.id}</span>
+        ${tx.status === 'confirmé' ? '<span class="badge ok">Confirmé</span>' : `<span class="badge" style="background:rgba(210,153,34,0.15);color:var(--orange);">${tx.status || 'En attente'}</span>`}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Invoices ──
+
+async function loadInvoices() {
+  try {
+    const data = await api('/api/web3/invoice/list');
+    invoices = data.invoices || [];
+    renderInvoices();
+  } catch(e) {}
+}
+
+function renderInvoices() {
+  const container = document.getElementById('invoiceList');
+  if (!invoices.length) {
+    container.innerHTML = '<div class="empty">Aucune facture</div>';
+    return;
+  }
+  container.innerHTML = invoices.map(inv => `
+    <div class="wallet-row">
+      <div>
+        <strong>${inv.label || 'Facture'}</strong>
+        <div style="font-size:12px;color:var(--text-dim);">${inv.description || ''}</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">
+          ${inv.from ? inv.from.slice(0,10)+'... → ' : ''}${inv.to ? inv.to.slice(0,10)+'...' : ''}
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div class="wallet-bal">${inv.amount_brt} <small>BRT</small></div>
+        <span class="badge ${inv.status === 'payée' ? 'ok' : ''}" style="${inv.status !== 'payée' ? 'background:rgba(210,153,34,0.15);color:var(--orange);' : ''}">${inv.status || 'émise'}</span>
+        ${inv.due_date ? `<div style="font-size:11px;color:var(--text-dim);">Échéance: ${inv.due_date}</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function createInvoice() {
+  const to = document.getElementById('invTo').value;
+  const amount = parseFloat(document.getElementById('invAmount').value);
+  const label = document.getElementById('invLabel').value;
+  const description = document.getElementById('invDesc').value;
+  const due_date = document.getElementById('invDue').value;
+  if (!to || !amount) { toast('Destinataire et montant requis', 'var(--red)'); return; }
+  const res = await api('/api/web3/invoice/create', { method:'POST', body:JSON.stringify({to, amount_brt:amount, label, description, due_date}) });
+  if (res.error) { toast(res.error, 'var(--red)'); return; }
+  toast('Facture créée !');
+  loadInvoices();
+}
+
+// ── Settings ──
+
+let rate = 0;
+
+async function loadRate() {
+  try {
+    const data = await api('/api/web3/rates');
+    rate = data.brt_per_eur || 0;
+    document.getElementById('rateDisplay').textContent = rate;
+    document.getElementById('rateInput').value = rate;
+  } catch(e) {}
+}
+
+async function setRate() {
+  const v = parseFloat(document.getElementById('rateInput').value);
+  if (!v) return;
+  await api('/api/web3/rates', { method:'PUT', body:JSON.stringify({brt_per_eur:v}) });
+  rate = v;
+  toast('Taux mis à jour');
+  loadRate();
+}
+
+// ── Init ──
+
+loadRate();
+refreshAll();
+</script>
+{% endblock %}

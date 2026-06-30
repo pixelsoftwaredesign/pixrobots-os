@@ -1,0 +1,395 @@
+{% extends "base.html" %}
+{% block title %}Gestionnaire de Processus{% endblock %}
+{% block content %}
+<style>
+.proc-table { width:100%; background:var(--card); border:1px solid var(--border); border-radius:8px; border-collapse:collapse; overflow:hidden; font-size:13px; }
+.proc-table th { text-align:left; padding:10px 12px; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-dim); border-bottom:1px solid var(--border); }
+.proc-table td { padding:8px 12px; border-bottom:1px solid var(--border); }
+.proc-table tr:hover td { background:rgba(255,255,255,0.03); }
+.proc-table .cpu-bar { height:4px; background:var(--border); border-radius:2px; overflow:hidden; width:60px; display:inline-block; vertical-align:middle; margin-right:6px; }
+.proc-table .cpu-fill { height:100%; border-radius:2px; }
+.pid-link { color:var(--blue); cursor:pointer; font-family:monospace; }
+.pid-link:hover { text-decoration:underline; }
+.whitelisted { color:var(--green); }
+.unknown { color:var(--orange); }
+.detail-panel { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:20px; margin-bottom:20px; }
+.detail-panel h3 { margin-bottom:12px; }
+.detail-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
+</style>
+
+<h1 style="margin-bottom:20px">⚙️ Gestionnaire de Processus</h1>
+
+<div class="tabs" id="tabs" style="display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap">
+  <div class="tab active" data-tab="list" style="padding:10px 20px;background:var(--card);border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--text-dim);font-size:13px">Processus</div>
+  <div class="tab" data-tab="new" style="padding:10px 20px;background:var(--card);border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--text-dim);font-size:13px">Nouveaux</div>
+  <div class="tab" data-tab="monitor" style="padding:10px 20px;background:var(--card);border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--text-dim);font-size:13px">Monitoring</div>
+  <div class="tab" data-tab="whitelist" style="padding:10px 20px;background:var(--card);border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--text-dim);font-size:13px">Whitelist</div>
+  <div class="tab" data-tab="kill" style="padding:10px 20px;background:var(--card);border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--text-dim);font-size:13px">Kill</div>
+</div>
+
+<div class="stats-grid" id="statsGrid">
+  <div class="stat-card"><div class="label">Processus total</div><div class="value blue" id="procTotal">-</div></div>
+  <div class="stat-card"><div class="label">CPU total</div><div class="value" id="procCpu">-</div></div>
+  <div class="stat-card"><div class="label">RAM totale</div><div class="value" id="procMem">-</div></div>
+  <div class="stat-card"><div class="label">Whitelisted</div><div class="value green" id="procWl">-</div></div>
+</div>
+
+<div class="toolbar" style="margin-bottom:16px">
+  <button class="btn-blue" onclick="loadProcesses()">🔄 Actualiser</button>
+  <button class="btn-green" onclick="detectNew()">🔍 Détecter nouveaux</button>
+  <select id="sortSelect" onchange="loadProcesses()" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px">
+    <option value="cpu">Tri: CPU</option>
+    <option value="mem">Tri: Mémoire</option>
+    <option value="pid">Tri: PID</option>
+    <option value="name">Tri: Nom</option>
+    <option value="priority">Tri: Priorité</option>
+  </select>
+</div>
+
+<div id="tab-list" class="tab-content" style="display:block">
+  <div id="procTableContainer"></div>
+</div>
+
+<div id="tab-new" class="tab-content" style="display:none">
+  <div id="newProcContainer"></div>
+</div>
+
+<div id="tab-monitor" class="tab-content" style="display:none">
+  <div class="toolbar">
+    <button class="btn-green" onclick="monitorStart()">▶️ Démarrer</button>
+    <button class="btn-red" onclick="monitorStop()">⏹️ Arrêter</button>
+    <button class="btn-blue" onclick="monitorStatus()">🔄 Statut</button>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-card"><div class="label">Monitoring</div><div class="value blue" id="monActive">-</div></div>
+    <div class="stat-card"><div class="label">PIDs connus</div><div class="value" id="monKnown">-</div></div>
+    <div class="stat-card"><div class="label">Nouveaux loggés</div><div class="value" id="monNew">-</div></div>
+  </div>
+  <div id="monitorLog"></div>
+</div>
+
+<div id="tab-whitelist" class="tab-content" style="display:none">
+  <div class="toolbar">
+    <input type="text" id="wlNameInput" placeholder="Nom du processus..." style="width:200px">
+    <select id="wlCatSelect" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px">
+      <option value="custom">custom</option>
+      <option value="system">system</option>
+      <option value="pixelos">pixelos</option>
+      <option value="network">network</option>
+      <option value="shell">shell</option>
+    </select>
+    <button class="btn-green" onclick="whitelistAdd()">+ Ajouter</button>
+    <button class="btn-blue" onclick="loadWhitelist()">🔄 Actualiser</button>
+  </div>
+  <div id="whitelistContainer"></div>
+</div>
+
+<div id="tab-kill" class="tab-content" style="display:none">
+  <div style="margin-bottom:16px">
+    <h3 class="section-title">Tuer par PID</h3>
+    <div class="toolbar">
+      <input type="number" id="killPidInput" placeholder="PID..." style="width:120px">
+      <select id="killSigSelect" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px">
+        <option value="15">SIGTERM (15)</option>
+        <option value="9">SIGKILL (9)</option>
+        <option value="2">SIGINT (2)</option>
+        <option value="1">SIGHUP (1)</option>
+      </select>
+      <button class="btn-red" onclick="killPid()">💀 Tuer</button>
+    </div>
+  </div>
+  <div style="margin-bottom:16px">
+    <h3 class="section-title">Tuer par nom</h3>
+    <div class="toolbar">
+      <input type="text" id="killNameInput" placeholder="Nom..." style="width:200px">
+      <button class="btn-red" onclick="killName()">💀 Tuer</button>
+    </div>
+  </div>
+  <div style="margin-bottom:16px">
+    <h3 class="section-title">Tuer basse priorité</h3>
+    <div class="toolbar">
+      <span style="color:var(--text-dim);font-size:13px">Max priority:</span>
+      <input type="number" id="killPrioInput" value="20" style="width:80px">
+      <button class="btn-orange" onclick="killLowPriority()">🧹 Nettoyer</button>
+    </div>
+  </div>
+  <div>
+    <h3 class="section-title">Tuer par mémoire</h3>
+    <div class="toolbar">
+      <span style="color:var(--text-dim);font-size:13px">Seuil MB:</span>
+      <input type="number" id="killMemInput" value="500" style="width:100px">
+      <button class="btn-orange" onclick="killByMem()">💾 Nettoyer RAM</button>
+    </div>
+  </div>
+  <div id="killResults"></div>
+</div>
+
+<div id="detailPanel" class="detail-panel" style="display:none"></div>
+
+<script>
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.tab').forEach(el => {
+    el.style.background = 'var(--card)';
+    el.style.color = 'var(--text-dim)';
+    el.style.borderColor = 'var(--border)';
+  });
+  document.getElementById('tab-' + tab).style.display = 'block';
+  document.querySelector(`.tab[data-tab="${tab}"]`).style.background = 'var(--accent)';
+  document.querySelector(`.tab[data-tab="${tab}"]`).style.color = '#fff';
+  document.querySelector(`.tab[data-tab="${tab}"]`).style.borderColor = 'var(--accent)';
+}
+document.getElementById('tabs').addEventListener('click', function(e) {
+  const tab = e.target.closest('.tab');
+  if (tab) switchTab(tab.dataset.tab);
+});
+
+async function api(url, opts) {
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+function fmtBytes(b) {
+  if (b >= 1073741824) return (b/1073741824).toFixed(1)+' GB';
+  if (b >= 1048576) return (b/1048576).toFixed(1)+' MB';
+  if (b >= 1024) return (b/1024).toFixed(1)+' KB';
+  return b+' B';
+}
+
+function cpuColor(pct) {
+  if (pct > 50) return 'var(--red)';
+  if (pct > 20) return 'var(--orange)';
+  return 'var(--green)';
+}
+
+// ── Stats ──
+async function loadStats() {
+  const s = await api('/api/processes/stats');
+  document.getElementById('procTotal').textContent = s.total_processes || 0;
+  document.getElementById('procCpu').textContent = (s.total_cpu || 0) + '%';
+  document.getElementById('procMem').textContent = (s.total_mem || 0) + '%';
+  document.getElementById('procWl').textContent = (s.whitelisted || 0) + '/' + (s.total_processes || 0);
+}
+
+// ── Process list ──
+async function loadProcesses() {
+  const sort = document.getElementById('sortSelect').value;
+  const d = await api('/api/processes?sort=' + sort + '&limit=100');
+  const procs = d.processes || [];
+  let html = '<table class="proc-table"><tr><th>PID</th><th>Nom</th><th>CPU%</th><th>MEM%</th><th>RSS</th><th>État</th><th>Whitelist</th><th>Action</th></tr>';
+  for (const p of procs) {
+    const c = cpuColor(p.cpu_pct);
+    html += `<tr>
+      <td class="pid-link" onclick="showDetail(${p.pid})">${p.pid}</td>
+      <td><strong>${p.name}</strong><br><span style="font-size:11px;color:var(--text-dim)">${(p.command||'').slice(0,60)}</span></td>
+      <td>
+        <div class="cpu-bar"><div class="cpu-fill" style="width:${Math.min(p.cpu_pct,100)}%;background:${c}"></div></div>
+        ${p.cpu_pct.toFixed(1)}%
+      </td>
+      <td>${p.mem_pct.toFixed(1)}%</td>
+      <td>${fmtBytes(p.rss_bytes)}</td>
+      <td><span class="badge ${p.state === 'R' ? 'running' : 'stopped'}">${p.state}</span></td>
+      <td><span class="badge ${p.whitelisted ? 'ok' : 'offline'}">${p.whitelist_category}</span></td>
+      <td><button class="btn-red" style="padding:4px 10px;font-size:12px" onclick="doKill(${p.pid})">Kill</button>
+          <button class="btn-blue" style="padding:4px 10px;font-size:12px" onclick="doTrace(${p.pid})">Trace</button></td>
+    </tr>`;
+  }
+  html += '</table>';
+  document.getElementById('procTableContainer').innerHTML = html;
+}
+
+// ── Detail ──
+async function showDetail(pid) {
+  const p = await api('/api/processes/' + pid);
+  if (p.error) { alert(p.error); return; }
+  document.getElementById('detailPanel').style.display = 'block';
+  document.getElementById('detailPanel').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3>${p.name} (PID ${p.pid})</h3>
+      <div><button class="btn-red" onclick="doKill(${p.pid})">💀 Kill</button>
+      <button class="btn-blue" onclick="doTrace(${p.pid})">🔍 Trace</button></div>
+    </div>
+    <div class="detail-grid">
+      <div><strong>PPID</strong><br><span style="color:var(--text-dim)">${p.ppid}</span></div>
+      <div><strong>CPU</strong><br><span style="color:${cpuColor(p.cpu_pct)}">${p.cpu_pct}%</span></div>
+      <div><strong>Mémoire</strong><br><span style="color:var(--text-dim)">${p.mem_pct}% (${fmtBytes(p.rss_bytes)})</span></div>
+      <div><strong>État</strong><br><span class="badge ${p.state === 'R' ? 'running' : 'stopped'}">${p.state}</span></div>
+      <div><strong>Démarré</strong><br><span style="color:var(--text-dim)">${p.started}</span></div>
+      <div><strong>Whitelist</strong><br><span class="badge ${p.whitelisted ? 'ok' : 'offline'}">${p.whitelist_category}</span></div>
+    </div>
+    <div style="margin-top:12px">
+      <strong>Commande</strong><br><span style="font-family:monospace;font-size:12px;color:var(--text-dim);word-break:break-all">${p.command}</span>
+    </div>
+  `;
+}
+
+// ── Kill ──
+async function doKill(pid) {
+  if (!confirm(`Tuer PID ${pid}?`)) return;
+  const r = await api('/api/processes/' + pid + '/kill', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{"signal":15}'});
+  alert(r.status === 'killed' ? `✅ PID ${pid} tué` : `❌ ${r.status}`);
+  loadProcesses(); loadStats();
+}
+
+async function killPid() {
+  const pid = parseInt(document.getElementById('killPidInput').value);
+  if (!pid) return alert('Entrez un PID');
+  const sig = parseInt(document.getElementById('killSigSelect').value);
+  if (!confirm(`Tuer PID ${pid} avec signal ${sig}?`)) return;
+  const r = await api('/api/processes/' + pid + '/kill', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({signal:sig})});
+  document.getElementById('killResults').innerHTML = `<div class="port-card">💀 ${r.status} — PID ${pid}</div>`;
+}
+
+async function killName() {
+  const name = document.getElementById('killNameInput').value.trim();
+  if (!name) return alert('Entrez un nom');
+  if (!confirm(`Tuer tous les processus "${name}"?`)) return;
+  const r = await api('/api/processes/kill-by-name', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
+  document.getElementById('killResults').innerHTML = `<div class="port-card">💀 ${r.status} — ${name}</div>`;
+}
+
+async function killLowPriority() {
+  const max = parseInt(document.getElementById('killPrioInput').value) || 20;
+  if (!confirm(`Tuer tous les processus non-whitelistés de priorité ≤ ${max}?`)) return;
+  const r = await api('/api/processes/kill-low-priority', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({max_priority:max})});
+  document.getElementById('killResults').innerHTML = `<div class="port-card">🧹 ${r.count} processus tués</div>`;
+  if (r.killed?.length) {
+    document.getElementById('killResults').innerHTML += r.killed.map(k => `<div class="port-card">💀 ${k.name} (PID ${k.pid})</div>`).join('');
+  }
+  loadProcesses(); loadStats();
+}
+
+async function killByMem() {
+  const threshold = parseInt(document.getElementById('killMemInput').value) || 500;
+  if (!confirm(`Tuer les processus non-whitelistés utilisant >${threshold} MB?`)) return;
+  const r = await api('/api/processes/kill-by-memory', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({threshold_mb:threshold})});
+  document.getElementById('killResults').innerHTML = `<div class="port-card">💾 ${r.count} processus tués</div>`;
+  if (r.killed?.length) {
+    document.getElementById('killResults').innerHTML += r.killed.map(k => `<div class="port-card">💀 ${k.name} (PID ${k.pid}) — ${k.rss_mb} MB</div>`).join('');
+  }
+  loadProcesses(); loadStats();
+}
+
+// ── Trace ──
+async function doTrace(pid) {
+  const r = await api('/api/processes/' + pid + '/trace', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{"duration":10}'});
+  if (r.syscalls) {
+    document.getElementById('detailPanel').style.display = 'block';
+    document.getElementById('detailPanel').innerHTML = `
+      <h3>🔍 Trace PID ${pid} (${r.count} appels système)</h3>
+      <pre style="background:var(--bg);padding:12px;border-radius:6px;font-size:11px;max-height:400px;overflow-y:auto;margin-top:8px;color:var(--text-dim)">${r.syscalls.join('\n')}</pre>
+    `;
+  } else if (r.snapshots) {
+    document.getElementById('detailPanel').style.display = 'block';
+    document.getElementById('detailPanel').innerHTML = `
+      <h3>📊 Monitoring PID ${pid} (${r.duration_s}s)</h3>
+      <pre style="background:var(--bg);padding:12px;border-radius:6px;font-size:11px;max-height:400px;overflow-y:auto;margin-top:8px;color:var(--text-dim)">${r.snapshots.join('\n')}</pre>
+    `;
+  } else {
+    alert('Erreur: ' + (r.error || 'inconnue'));
+  }
+}
+
+// ── New processes ──
+async function detectNew() {
+  const r = await api('/api/processes/detect', {method:'POST'});
+  loadNewProcesses();
+  if (r.new?.length) {
+    alert(`${r.count} nouveau(x) processus détecté(s)`);
+  }
+}
+
+async function loadNewProcesses() {
+  const r = await api('/api/processes/new');
+  const procs = r.processes || [];
+  let html = `<h3 class="section-title">Nouveaux processus (${procs.length})</h3>`;
+  if (procs.length === 0) {
+    html += '<p style="color:var(--text-dim)">Aucun nouveau processus détecté.</p>';
+  } else {
+    html += '<table class="proc-table"><tr><th>PID</th><th>Nom</th><th>PPID</th><th>Whitelist</th><th>Détecté</th></tr>';
+    for (const p of procs) {
+      html += `<tr>
+        <td class="pid-link" onclick="showDetail(${p.pid})">${p.pid}</td>
+        <td>${p.name}</td>
+        <td>${p.ppid}</td>
+        <td><span class="badge ${p.whitelisted ? 'ok' : 'offline'}">${p.whitelist_category}</span></td>
+        <td style="font-size:12px;color:var(--text-dim)">${(p.detected_at||'').slice(11,19)}</td>
+      </tr>`;
+    }
+    html += '</table>';
+  }
+  document.getElementById('newProcContainer').innerHTML = html;
+}
+
+// ── Monitoring ──
+async function monitorStart() {
+  const r = await api('/api/processes/monitor/start', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{"interval":5}'});
+  alert(r.status === 'started' ? 'Monitoring démarré' : r.status);
+  monitorStatus();
+}
+
+async function monitorStop() {
+  const r = await api('/api/processes/monitor/stop', {method:'POST'});
+  alert('Monitoring arrêté');
+  monitorStatus();
+}
+
+async function monitorStatus() {
+  const s = await api('/api/processes/monitor/status');
+  document.getElementById('monActive').textContent = s.monitoring ? 'Actif' : 'Inactif';
+  document.getElementById('monActive').style.color = s.monitoring ? 'var(--green)' : 'var(--text-dim)';
+  document.getElementById('monKnown').textContent = s.known_pids || 0;
+  document.getElementById('monNew').textContent = s.new_processes_logged || 0;
+  document.getElementById('monitorLog').innerHTML = `
+    <div class="port-card">
+      <div>Monitoring: <strong>${s.monitoring ? '✅ Actif' : '⏸️ Inactif'}</strong></div>
+      <div style="margin-top:8px;color:var(--text-dim);font-size:13px">
+        PIDs connus: ${s.known_pids} · Nouveaux: ${s.new_processes_logged} · Thread: ${s.thread_alive ? '✅' : '❌'}
+      </div>
+    </div>
+  `;
+}
+
+// ── Whitelist ──
+async function loadWhitelist() {
+  const w = await api('/api/processes/whitelist');
+  const byCat = w.by_category || {};
+  let html = `<h3 class="section-title">Whitelist (${w.total} processus)</h3>`;
+  for (const [cat, procs] of Object.entries(byCat)) {
+    html += `<div class="port-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong>${cat}</strong> <span class="badge running">${procs.length}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">`;
+    for (const p of procs) {
+      html += `<span style="background:var(--bg);padding:4px 10px;border-radius:12px;font-size:12px;font-family:monospace">
+        ${p} <span style="cursor:pointer;color:var(--red);margin-left:4px" onclick="whitelistRemove('${p}')">✕</span>
+      </span>`;
+    }
+    html += `</div></div>`;
+  }
+  document.getElementById('whitelistContainer').innerHTML = html;
+}
+
+async function whitelistAdd() {
+  const name = document.getElementById('wlNameInput').value.trim();
+  if (!name) return alert('Entrez un nom de processus');
+  const cat = document.getElementById('wlCatSelect').value;
+  const r = await api('/api/processes/whitelist/add', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, category:cat})});
+  alert(r.status === 'added' ? `✅ ${name} ajouté à ${r.category}` : `ℹ️ Déjà whitelisté (${r.category})`);
+  loadWhitelist();
+  document.getElementById('wlNameInput').value = '';
+}
+
+async function whitelistRemove(name) {
+  if (!confirm(`Retirer "${name}" de la whitelist?`)) return;
+  const r = await api('/api/processes/whitelist/remove', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
+  loadWhitelist();
+}
+
+// ── Init ──
+loadStats();
+loadProcesses();
+monitorStatus();
+</script>
+{% endblock %}

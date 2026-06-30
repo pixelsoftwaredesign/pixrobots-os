@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}RL Controller - PixelOS{% endblock %}
+{% block content %}
+<style>
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+.card h3 { font-size: 13px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.card .value { font-size: 28px; font-weight: 700; }
+.card .value.green { color: var(--green); }
+.card .value.blue { color: var(--blue); }
+.card .value.orange { color: var(--orange); }
+input, select { width: 100%; padding: 10px 12px; margin-bottom: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 14px; }
+label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.row { display: flex; gap: 12px; }
+.row > * { flex: 1; }
+.empty { color: var(--text-dim); text-align: center; padding: 40px 0; }
+.result-box { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-top: 12px; font-family: monospace; font-size: 13px; white-space: pre-wrap; }
+table { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 8px; border-collapse: collapse; overflow: hidden; }
+th { text-align: left; padding: 10px 14px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); border-bottom: 1px solid var(--border); }
+td { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+tr:last-child td { border-bottom: none; }
+.action-off { color: var(--text-dim); }
+.action-on { color: var(--green); font-weight: 600; }
+.action-throttle { color: var(--orange); }
+.action-rain { color: var(--blue); }
+</style>
+
+<div class="toolbar">
+  <h2 style="flex:1;font-size:20px;"><span>&#x1F916;</span> RL Controller <span style="font-size:12px;color:var(--text-dim);font-weight:400;">Q-learning · Irrigation</span></h2>
+  <select id="rlZone" style="width:auto;" onchange="refreshAll()"><option value="serre_a">Serre A</option><option value="serre_b">Serre B</option><option value="plein_champ">Plein champ</option></select>
+  <button class="btn-blue" onclick="refreshAll()">&#x21bb;</button>
+</div>
+
+<div class="grid" id="statsGrid"></div>
+
+<div class="card" style="max-width:500px;margin-bottom:20px;">
+  <h3 style="margin-bottom:12px;">Simuler une décision</h3>
+  <div class="row">
+    <div><label>Humidité sol (%)</label><input id="rlMoist" type="number" value="45"></div>
+    <div><label>Température (°C)</label><input id="rlTemp" type="number" value="22"></div>
+  </div>
+  <label>Heure</label><input id="rlHour" type="number" min="0" max="23" value="10">
+  <button class="btn-green" onclick="runStep()">&#x25B6; Exécuter</button>
+  <div id="rlResult" style="margin-top:12px;"></div>
+</div>
+
+<div class="card">
+  <h3 style="margin-bottom:12px;">Historique des actions</h3>
+  <div id="rlHistory"><div class="empty">Chargement...</div></div>
+</div>
+
+<script>
+async function api(url, opts={}) {
+  const r = await fetch(url, { headers:{'Content-Type':'application/json'}, ...opts });
+  return r.json();
+}
+
+async function refreshAll() {
+  const zone = document.getElementById('rlZone').value;
+  const [stats, history] = await Promise.all([
+    api('/api/rl/stats?zone=' + zone),
+    api('/api/rl/history?zone=' + zone + '&limit=20'),
+  ]);
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="card"><h3>Zone</h3><div class="value blue">${zone}</div></div>
+    <div class="card"><h3>Epsilon (exploration)</h3><div class="value ${(stats.epsilon||1) > 0.3 ? 'orange' : 'green'}">${(stats.epsilon||0).toFixed(3)}</div></div>
+    <div class="card"><h3>Actions totales</h3><div class="value">${stats.total_actions || 0}</div></div>
+    <div class="card"><h3>Récompense moyenne</h3><div class="value green">${(stats.avg_reward || 0).toFixed(2)}</div></div>`;
+  renderHistory(history);
+}
+
+const ACTION_LABELS = { 0: 'Arrêt', 1: 'Arrosage 5min', 2: 'Arrosage 10min', 3: 'Arrosage 15min', 4: 'Arrosage 30min' };
+const ACTION_CLASSES = { 0: 'action-off', 1: 'action-on', 2: 'action-on', 3: 'action-on', 4: 'action-on' };
+
+function renderHistory(data) {
+  const list = data.history || data.actions || [];
+  const container = document.getElementById('rlHistory');
+  if (!list.length) { container.innerHTML = '<div class="empty">Aucune action enregistrée</div>'; return; }
+  container.innerHTML = `<table><tr><th>Action</th><th>État (hum, temp, h)</th><th>Récompense</th><th>Heure</th></tr>${
+    list.map(a => `<tr>
+      <td class="${ACTION_CLASSES[a.action] || ''}">${ACTION_LABELS[a.action] || 'Action ' + a.action}</td>
+      <td style="font-size:12px;color:var(--text-dim);">${a.moisture||'?'}% · ${a.temp||'?'}°C · ${a.hour||'?'}h</td>
+      <td>${a.reward != null ? a.reward.toFixed(2) : '—'}</td>
+      <td style="font-size:12px;color:var(--text-dim);">${(a.timestamp||'').slice(11,19) || '—'}</td>
+    </tr>`).join('')}</table>`;
+}
+
+async function runStep() {
+  const zone = document.getElementById('rlZone').value;
+  const moisture = parseFloat(document.getElementById('rlMoist').value);
+  const temp = parseFloat(document.getElementById('rlTemp').value);
+  const hour = parseInt(document.getElementById('rlHour').value);
+  const data = await api('/api/rl/step', { method:'POST', body:JSON.stringify({zone, moisture, temp, hour}) });
+  document.getElementById('rlResult').innerHTML = `<div class="result-box">
+    <strong>Action choisie :</strong> ${ACTION_LABELS[data.action] || data.action}<br>
+    <strong>Epsilon :</strong> ${(data.epsilon||0).toFixed(3)}<br>
+    <strong>Meilleure action :</strong> ${ACTION_LABELS[data.best] || data.best}
+  </div>`;
+  refreshAll();
+}
+
+refreshAll();
+</script>
+{% endblock %}

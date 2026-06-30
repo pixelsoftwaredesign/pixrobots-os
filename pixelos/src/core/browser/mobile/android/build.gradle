@@ -1,0 +1,63 @@
+// NOP Browser — Android build.gradle (app module)
+// Build: ./gradlew assembleRelease
+// APK:    app/build/outputs/apk/release/app-release-unsigned.apk
+
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'org.pixelos.nopbrowser'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "org.pixelos.nopbrowser"
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+        multiDexEnabled true
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.debug  // Replace with release key for production
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.webkit:webkit:1.9.0'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+}
+
+// ── network_security_config.xml ──────────────────────────
+// Allows cleartext to 127.0.0.1 for the NOP bridge
+android.applicationVariants.all { variant ->
+    variant.mergeResourcesProvider.configure {
+        def xmlDir = project.buildDir.toPath().resolve("generated/res/xml")
+        xmlDir.toFile().mkdirs()
+        def xmlFile = xmlDir.resolve("network_security_config.xml").toFile()
+        xmlFile.text = '''<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">localhost</domain>
+    </domain-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>'''
+    }
+}

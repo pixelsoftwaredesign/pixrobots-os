@@ -1,0 +1,615 @@
+[
+  {
+    "id": "serre_a",
+    "type": "serre",
+    "label": "Serre A - Tomates",
+    "location": "Parcelle nord",
+    "description": "Serre principale de production tomates",
+    "auto_irrigation": true,
+    "auto_climate": true,
+    "auto_light": true,
+    "sensors": [
+      {
+        "id": "temp_serre_a",
+        "type": "temperature",
+        "label": "Air Serre A",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "hum_air_serre_a",
+        "type": "humidite_air",
+        "label": "Humidite air Serre A",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "hum_sol_serre_a",
+        "type": "humidite_sol",
+        "label": "Humidite sol Serre A",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "lum_serre_a",
+        "type": "lumiere",
+        "label": "Luminosite Serre A",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "npk_serre_a",
+        "type": "npk",
+        "label": "NPK Sol Serre A",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "ph_serre_a",
+        "type": "ph",
+        "label": "pH Sol Serre A",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "co2_serre_a",
+        "type": "co2",
+        "label": "CO2 Serre A",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "flow_serre_a",
+        "type": "irrigation_flow",
+        "label": "Debit irrigation Serre A",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      }
+    ],
+    "controls": [
+      {
+        "id": "irrig_serre_a",
+        "type": "vanne_irrigation",
+        "label": "Vanne irrigation Serre A",
+        "pin": null,
+        "enabled": true,
+        "auto": true
+      },
+      {
+        "id": "irrig_serre_a_pwm",
+        "type": "vanne_pwm",
+        "label": "Regulation debit irrigation A",
+        "pin": null,
+        "enabled": true,
+        "auto": true
+      },
+      {
+        "id": "chauff_serre_a",
+        "type": "chauffage",
+        "label": "Chauffage Serre A",
+        "pin": null,
+        "enabled": true,
+        "auto": true
+      },
+      {
+        "id": "eclairage_serre_a",
+        "type": "eclairage",
+        "label": "Eclairage croissance A",
+        "pin": null,
+        "enabled": true,
+        "auto": true
+      },
+      {
+        "id": "brumi_serre_a",
+        "type": "brumisateur",
+        "label": "Brumisateur Serre A",
+        "pin": null,
+        "enabled": true,
+        "auto": true
+      },
+      {
+        "id": "extract_serre_a",
+        "type": "extracteur",
+        "label": "Extracteur air Serre A",
+        "pin": null,
+        "enabled": true,
+        "auto": true
+      },
+      {
+        "id": "pompe_serre_a",
+        "type": "pompe",
+        "label": "Pompe irrigation A",
+        "pin": null,
+        "enabled": true,
+        "auto": false
+      }
+    ],
+    "sub_zones": [
+      {
+        "id": "za1",
+        "label": "Zone A1 - Tomates",
+        "area_m2": 45,
+        "product_id": null,
+        "planted_at": null,
+        "culture": "tomate_coeur_de_boeuf"
+      },
+      {
+        "id": "za2",
+        "label": "Zone A2 - Tomates",
+        "area_m2": 40,
+        "product_id": null,
+        "planted_at": null,
+        "culture": "tomate_coeur_de_boeuf"
+      }
+    ]
+  },
+  {
+    "id": "serre_b",
+    "type": "serre",
+    "label": "Serre B - Laitues & aromatiques",
+    "location": "Parcelle nord",
+    "description": "Serre de production laitues et fines herbes",
+    "auto_irrigation": true,
+    "auto_climate": true,
+    "auto_light": true,
+    "sensors": [
+      {
+        "id": "temp_serre_b",
+        "type": "temperature",
+        "label": "Air Serre B",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "hum_air_serre_b",
+        "type": "humidite_air",
+        "label": "Humidite air Serre B",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "hum_sol_serre_b",
+        "type": "humidite_sol",
+        "label": "Humidite sol Serre B",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "lum_serre_b",
+        "type": "lumiere",
+        "label": "Luminosite Serre B",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "npk_serre_b",
+        "type": "npk",
+        "label": "NPK Sol Serre B",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "ph_serre_b",
+        "type": "ph",
+        "label": "pH Sol Serre B",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "flow_serre_b",
+        "type": "irrigation_flow",
+        "label": "Debit irrigation Serre B",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      }
+    ],
+    "controls": [
+      {
+        "id": "irrig_serre_b",
+        "type": "vanne_irrigation",
+        "label": "Vanne irrigation Serre B",
+        "pin": null,
+        "enabled": true,
+        "auto": true
+      },
+      {
+        "id": "chauff_serre_b",
+        "type": "chauffage",
+        "label": "Chauffage Serre B",
+        "pin": null,
+        "enabled": true,
+        "auto": true
+      },
+      {
+        "id": "eclairage_serre_b",
+        "type": "eclairage",
+        "label": "Eclairage croissance B",
+        "pin": null,
+        "enabled": true,
+        "auto": true
+      },
+      {
+        "id": "brumi_serre_b",
+        "type": "brumisateur",
+        "label": "Brumisateur Serre B",
+        "pin": null,
+        "enabled": true,
+        "auto": false
+      },
+      {
+        "id": "extract_serre_b",
+        "type": "extracteur",
+        "label": "Extracteur air Serre B",
+        "pin": null,
+        "enabled": true,
+        "auto": true
+      }
+    ],
+    "sub_zones": [
+      {
+        "id": "zb1",
+        "label": "Zone B1 - Laitues",
+        "area_m2": 50,
+        "product_id": null,
+        "planted_at": null,
+        "culture": "laitue_romaine"
+      },
+      {
+        "id": "zb2",
+        "label": "Zone B2 - Aromatiques",
+        "area_m2": 25,
+        "product_id": null,
+        "planted_at": null,
+        "culture": ""
+      }
+    ]
+  },
+  {
+    "id": "pepiniere",
+    "type": "pepiniere",
+    "label": "Pepiniere - Semis & boutures",
+    "location": "Parcelle est",
+    "description": "Zone de semis, germination et elevage jeunes plants",
+    "auto_irrigation": true,
+    "auto_climate": true,
+    "auto_light": true,
+    "sensors": [
+      {
+        "id": "temp_pep",
+        "type": "temperature",
+        "label": "Air Pepiniere",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "hum_air_pep",
+        "type": "humidite_air",
+        "label": "Humidite air Pepiniere",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "hum_sol_pep",
+        "type": "humidite_sol",
+        "label": "Humidite substrat Pepiniere",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "lum_pep",
+        "type": "lumiere",
+        "label": "Luminosite Pepiniere",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "co2_pep",
+        "type": "co2",
+        "label": "CO2 Pepiniere",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      }
+    ],
+    "controls": [
+      {
+        "id": "irrig_pep",
+        "type": "vanne_irrigation",
+        "label": "Irrigation Pepiniere",
+        "pin": null,
+        "enabled": true,
+        "auto": true
+      },
+      {
+        "id": "chauff_pep",
+        "type": "chauffage",
+        "label": "Chauffage Pepiniere",
+        "pin": null,
+        "enabled": true,
+        "auto": true
+      },
+      {
+        "id": "eclairage_pep",
+        "type": "eclairage",
+        "label": "Eclairage pepiniere",
+        "pin": null,
+        "enabled": true,
+        "auto": true
+      },
+      {
+        "id": "ombriere_pep",
+        "type": "ombriere",
+        "label": "Ombriere Pepiniere",
+        "pin": null,
+        "enabled": true,
+        "auto": false
+      },
+      {
+        "id": "brumi_pep",
+        "type": "brumisateur",
+        "label": "Brumisateur pepiniere",
+        "pin": null,
+        "enabled": true,
+        "auto": false
+      }
+    ],
+    "sub_zones": [
+      {
+        "id": "zp1",
+        "label": "Table 1 - Semis",
+        "area_m2": 15,
+        "product_id": null,
+        "planted_at": null,
+        "culture": "semis"
+      },
+      {
+        "id": "zp2",
+        "label": "Table 2 - Boutures",
+        "area_m2": 15,
+        "product_id": null,
+        "planted_at": null,
+        "culture": "boutures"
+      },
+      {
+        "id": "zp3",
+        "label": "Table 3 - Repiquage",
+        "area_m2": 12,
+        "product_id": null,
+        "planted_at": null,
+        "culture": ""
+      }
+    ]
+  },
+  {
+    "id": "plein_champ",
+    "type": "plein_champ",
+    "label": "Plein Champ - Pommiers",
+    "location": "Parcelle sud",
+    "description": "Vergers de pommiers en pleine terre",
+    "auto_irrigation": false,
+    "auto_climate": false,
+    "auto_light": false,
+    "sensors": [
+      {
+        "id": "temp_champ",
+        "type": "temperature",
+        "label": "Air Plein Champ",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "hum_sol_champ",
+        "type": "humidite_sol",
+        "label": "Humidite sol Plein Champ",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "lum_champ",
+        "type": "lumiere",
+        "label": "Ensoleillement Champ",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "vent_champ",
+        "type": "vent_vitesse",
+        "label": "Vent Plein Champ",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "uv_champ",
+        "type": "uv_index",
+        "label": "UV Plein Champ",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      }
+    ],
+    "controls": [
+      {
+        "id": "irrig_champ",
+        "type": "vanne_irrigation",
+        "label": "Irrigation Plein Champ",
+        "pin": null,
+        "enabled": true,
+        "auto": true
+      },
+      {
+        "id": "pompe_champ",
+        "type": "pompe",
+        "label": "Pompe irrigation champ",
+        "pin": null,
+        "enabled": true,
+        "auto": false
+      }
+    ],
+    "sub_zones": [
+      {
+        "id": "zc1",
+        "label": "Champ Est - Pommiers Golden",
+        "area_m2": 200,
+        "product_id": null,
+        "planted_at": null,
+        "culture": "pommier_golden"
+      },
+      {
+        "id": "zc2",
+        "label": "Champ Ouest - Pommiers",
+        "area_m2": 180,
+        "product_id": null,
+        "planted_at": null,
+        "culture": "pommier_golden"
+      }
+    ]
+  },
+  {
+    "id": "verger",
+    "type": "verger",
+    "label": "Verger - Arbres fruitiers",
+    "location": "Parcelle ouest",
+    "description": "Verger mixte avec diverses especes fruitieres",
+    "auto_irrigation": false,
+    "auto_climate": false,
+    "auto_light": false,
+    "sensors": [
+      {
+        "id": "temp_verger",
+        "type": "temperature",
+        "label": "Air Verger",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "hum_sol_verger",
+        "type": "humidite_sol",
+        "label": "Humidite sol Verger",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      },
+      {
+        "id": "lum_verger",
+        "type": "lumiere",
+        "label": "Ensoleillement Verger",
+        "bus": "simulation",
+        "addr": null,
+        "enabled": true,
+        "alarm_low": null,
+        "alarm_high": null
+      }
+    ],
+    "controls": [
+      {
+        "id": "irrig_verger",
+        "type": "vanne_irrigation",
+        "label": "Irrigation Verger",
+        "pin": null,
+        "enabled": true,
+        "auto": true
+      }
+    ],
+    "sub_zones": [
+      {
+        "id": "zv1",
+        "label": "Parcelle Ouest",
+        "area_m2": 300,
+        "product_id": null,
+        "planted_at": null,
+        "culture": ""
+      }
+    ]
+  },
+  {
+    "id": "che3ba7",
+    "type": "plein_champ",
+    "label": "che3ba7",
+    "location": "",
+    "description": "",
+    "auto_irrigation": false,
+    "auto_climate": false,
+    "auto_light": false,
+    "sensors": [],
+    "controls": [],
+    "sub_zones": []
+  }
+]

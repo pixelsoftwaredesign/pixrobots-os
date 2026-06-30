@@ -1,0 +1,393 @@
+{
+  "products": [
+    {
+      "product_id": "tomate_coeur_de_boeuf",
+      "label": "Tomate Coeur de Boeuf",
+      "type": "legume",
+      "variete": "Coeur de Boeuf",
+      "cycle_days": 90,
+      "family": "Solanacees",
+      "tags": [],
+      "stages": [
+        {
+          "name": "germination",
+          "day_start": 0,
+          "day_end": 10,
+          "temp_min": 18,
+          "temp_max": 28,
+          "humidity_min": 70,
+          "humidity_max": 90,
+          "light_hours": 14,
+          "light_lux_min": 3000,
+          "light_lux_max": 15000,
+          "soil_moisture_min": 60,
+          "soil_moisture_max": 85,
+          "water_need": "high",
+          "tasks": [
+            "Semer en godets sous abri chauffe",
+            "Maintenir substrat humide",
+            "Surveiller emergence J5-J10"
+          ]
+        },
+        {
+          "name": "croissance",
+          "day_start": 11,
+          "day_end": 45,
+          "temp_min": 16,
+          "temp_max": 26,
+          "humidity_min": 60,
+          "humidity_max": 80,
+          "light_hours": 16,
+          "light_lux_min": 10000,
+          "light_lux_max": 40000,
+          "soil_moisture_min": 40,
+          "soil_moisture_max": 70,
+          "water_need": "medium",
+          "tasks": [
+            "Arroser regulierement sans exces",
+            "Apporter engrais NPK 10-10-10 toutes les 2 semaines",
+            "Tuteurer les plants",
+            "Surveiller mildiou et aleurodes"
+          ]
+        },
+        {
+          "name": "floraison",
+          "day_start": 46,
+          "day_end": 65,
+          "temp_min": 18,
+          "temp_max": 30,
+          "humidity_min": 50,
+          "humidity_max": 70,
+          "light_hours": 14,
+          "light_lux_min": 15000,
+          "light_lux_max": 50000,
+          "soil_moisture_min": 35,
+          "soil_moisture_max": 65,
+          "water_need": "medium",
+          "tasks": [
+            "Tailler les gourmands",
+            "Apporter engrais potassique",
+            "Secouer les fleurs pour pollinisation",
+            "Surveiller botrytis"
+          ]
+        },
+        {
+          "name": "fructification",
+          "day_start": 66,
+          "day_end": 85,
+          "temp_min": 18,
+          "temp_max": 30,
+          "humidity_min": 50,
+          "humidity_max": 75,
+          "light_hours": 14,
+          "light_lux_min": 15000,
+          "light_lux_max": 45000,
+          "soil_moisture_min": 45,
+          "soil_moisture_max": 75,
+          "water_need": "high",
+          "tasks": [
+            "Arrosage regulier (eviter alternance sec/humide)",
+            "Apporter engrais potassique",
+            "Soutenir les branches chargees de fruits",
+            "Surveiller oidium"
+          ]
+        },
+        {
+          "name": "recolte",
+          "day_start": 86,
+          "day_end": 90,
+          "temp_min": 16,
+          "temp_max": 28,
+          "humidity_min": 50,
+          "humidity_max": 75,
+          "light_hours": 12,
+          "light_lux_min": 8000,
+          "light_lux_max": 35000,
+          "soil_moisture_min": 30,
+          "soil_moisture_max": 60,
+          "water_need": "low",
+          "tasks": [
+            "Recolter les fruits a maturite",
+            "Retirer les fruits abimes",
+            "Preparer les plants pour la rotation culturale"
+          ]
+        }
+      ]
+    },
+    {
+      "product_id": "laitue_romaine",
+      "label": "Laitue Romaine",
+      "type": "legume",
+      "variete": "Romaine",
+      "cycle_days": 60,
+      "family": "Asteracees",
+      "tags": [],
+      "stages": [
+        {
+          "name": "germination",
+          "day_start": 0,
+          "day_end": 8,
+          "temp_min": 15,
+          "temp_max": 22,
+          "humidity_min": 70,
+          "humidity_max": 90,
+          "light_hours": 12,
+          "light_lux_min": 2000,
+          "light_lux_max": 10000,
+          "soil_moisture_min": 60,
+          "soil_moisture_max": 85,
+          "water_need": "high",
+          "tasks": [
+            "Semer en terrine fine",
+            "Maintenir humidite constante",
+            "Ne pas enterrer les graines"
+          ]
+        },
+        {
+          "name": "croissance",
+          "day_start": 9,
+          "day_end": 45,
+          "temp_min": 12,
+          "temp_max": 22,
+          "humidity_min": 60,
+          "humidity_max": 80,
+          "light_hours": 12,
+          "light_lux_min": 8000,
+          "light_lux_max": 30000,
+          "soil_moisture_min": 40,
+          "soil_moisture_max": 70,
+          "water_need": "medium",
+          "tasks": [
+            "Arroser au pied",
+            "Apporter compost mûr",
+            "Surveiller limaces",
+            "Eclaircir a 25cm"
+          ]
+        },
+        {
+          "name": "recolte",
+          "day_start": 46,
+          "day_end": 60,
+          "temp_min": 10,
+          "temp_max": 22,
+          "humidity_min": 50,
+          "humidity_max": 80,
+          "light_hours": 12,
+          "light_lux_min": 5000,
+          "light_lux_max": 25000,
+          "soil_moisture_min": 30,
+          "soil_moisture_max": 60,
+          "water_need": "low",
+          "tasks": [
+            "Recolter les pommes fermes",
+            "Couper au couteau pres du collet",
+            "Stockage au frais"
+          ]
+        }
+      ]
+    },
+    {
+      "product_id": "pommier_golden",
+      "label": "Pommier Golden",
+      "type": "arbre_fruitier",
+      "variete": "Golden Delicious",
+      "cycle_days": 365,
+      "family": "Rosacees",
+      "tags": [],
+      "stages": [
+        {
+          "name": "dormance",
+          "day_start": 0,
+          "day_end": 60,
+          "temp_min": -5,
+          "temp_max": 10,
+          "humidity_min": 40,
+          "humidity_max": 80,
+          "light_hours": 8,
+          "light_lux_min": 0,
+          "light_lux_max": 8000,
+          "soil_moisture_min": 20,
+          "soil_moisture_max": 50,
+          "water_need": "low",
+          "tasks": [
+            "Taille d'hiver",
+            "Appliquer enduit de cicatrisation",
+            "Pulveriser bouillie bordelaise"
+          ]
+        },
+        {
+          "name": "floraison",
+          "day_start": 61,
+          "day_end": 100,
+          "temp_min": 8,
+          "temp_max": 22,
+          "humidity_min": 50,
+          "humidity_max": 75,
+          "light_hours": 12,
+          "light_lux_min": 10000,
+          "light_lux_max": 50000,
+          "soil_moisture_min": 30,
+          "soil_moisture_max": 60,
+          "water_need": "medium",
+          "tasks": [
+            "Surveiller gelées tardives",
+            "Introduction ruches pour pollinisation",
+            "Traitement anti-tavelure"
+          ]
+        },
+        {
+          "name": "croissance_fruits",
+          "day_start": 101,
+          "day_end": 200,
+          "temp_min": 14,
+          "temp_max": 28,
+          "humidity_min": 50,
+          "humidity_max": 75,
+          "light_hours": 14,
+          "light_lux_min": 15000,
+          "light_lux_max": 60000,
+          "soil_moisture_min": 35,
+          "soil_moisture_max": 65,
+          "water_need": "medium",
+          "tasks": [
+            "Eclaircir les fruits (1-2 par bouquet)",
+            "Arrosage en periode seche",
+            "Surveiller carpocapse"
+          ]
+        },
+        {
+          "name": "maturation",
+          "day_start": 201,
+          "day_end": 280,
+          "temp_min": 12,
+          "temp_max": 28,
+          "humidity_min": 50,
+          "humidity_max": 75,
+          "light_hours": 12,
+          "light_lux_min": 10000,
+          "light_lux_max": 50000,
+          "soil_moisture_min": 25,
+          "soil_moisture_max": 55,
+          "water_need": "low",
+          "tasks": [
+            "Arreter l'arrosage 2 semaines avant recolte",
+            "Surveiller coloration des fruits",
+            "Preparer le materiel de recolte"
+          ]
+        },
+        {
+          "name": "recolte",
+          "day_start": 281,
+          "day_end": 300,
+          "temp_min": 8,
+          "temp_max": 22,
+          "humidity_min": 50,
+          "humidity_max": 80,
+          "light_hours": 10,
+          "light_lux_min": 5000,
+          "light_lux_max": 30000,
+          "soil_moisture_min": 20,
+          "soil_moisture_max": 45,
+          "water_need": "low",
+          "tasks": [
+            "Recolter a maturite optimale",
+            "Trier et stocker en chambre froide"
+          ]
+        },
+        {
+          "name": "post_recolte",
+          "day_start": 301,
+          "day_end": 365,
+          "temp_min": -5,
+          "temp_max": 10,
+          "humidity_min": 40,
+          "humidity_max": 80,
+          "light_hours": 8,
+          "light_lux_min": 0,
+          "light_lux_max": 8000,
+          "soil_moisture_min": 20,
+          "soil_moisture_max": 45,
+          "water_need": "low",
+          "tasks": [
+            "Apport de fumier composte",
+            "Taille de formation",
+            "Traitement d'automne"
+          ]
+        }
+      ]
+    },
+    {
+      "product_id": "basilic_grand_vert",
+      "label": "Basilic Grand Vert",
+      "type": "aromatique",
+      "variete": "Grand Vert",
+      "cycle_days": 60,
+      "family": "Lamiacees",
+      "tags": [],
+      "stages": [
+        {
+          "name": "germination",
+          "day_start": 0,
+          "day_end": 12,
+          "temp_min": 18,
+          "temp_max": 25,
+          "humidity_min": 70,
+          "humidity_max": 90,
+          "light_hours": 14,
+          "light_lux_min": 3000,
+          "light_lux_max": 12000,
+          "soil_moisture_min": 60,
+          "soil_moisture_max": 85,
+          "water_need": "high",
+          "tasks": [
+            "Semer en godets a 20°C min",
+            "Arroser en pluie fine",
+            "Ne pas laisser secher"
+          ]
+        },
+        {
+          "name": "croissance",
+          "day_start": 13,
+          "day_end": 45,
+          "temp_min": 16,
+          "temp_max": 28,
+          "humidity_min": 60,
+          "humidity_max": 80,
+          "light_hours": 14,
+          "light_lux_min": 10000,
+          "light_lux_max": 35000,
+          "soil_moisture_min": 40,
+          "soil_moisture_max": 70,
+          "water_need": "medium",
+          "tasks": [
+            "Pincer les extremites pour favoriser ramification",
+            "Arroser regulierement",
+            "Apporter engrais azote faible dose"
+          ]
+        },
+        {
+          "name": "recolte",
+          "day_start": 46,
+          "day_end": 60,
+          "temp_min": 14,
+          "temp_max": 28,
+          "humidity_min": 50,
+          "humidity_max": 75,
+          "light_hours": 12,
+          "light_lux_min": 5000,
+          "light_lux_max": 30000,
+          "soil_moisture_min": 30,
+          "soil_moisture_max": 60,
+          "water_need": "medium",
+          "tasks": [
+            "Recolter les feuilles avant floraison",
+            "Couper au-dessus d'un noeud",
+            "Conserver au frais ou secher"
+          ]
+        }
+      ]
+    }
+  ],
+  "plantations": [],
+  "updated": "2026-06-30T05:58:27.855017"
+}

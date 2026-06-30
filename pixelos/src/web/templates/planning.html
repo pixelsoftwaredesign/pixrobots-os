@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
+.cal-header h2 { margin: 0; color: var(--prod-green, #2e7d32); }
+.cal-nav { display: flex; gap: 8px; align-items: center; }
+.cal-nav button { padding: 6px 14px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-card); color: var(--text); cursor: pointer; font-weight: 600; }
+.cal-nav button:hover { background: var(--accent); color: #fff; }
+.cal-nav .month-label { font-size: 1.2em; font-weight: 700; min-width: 200px; text-align: center; }
+.filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; align-items: end; }
+.filters label { font-size: 0.82em; color: var(--text-muted); display: block; margin-bottom: 2px; }
+.filters select { padding: 5px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); min-width: 140px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.cal-day-header { background: var(--bg-card); padding: 8px; text-align: center; font-weight: 600; font-size: 0.82em; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+.cal-day { min-height: 100px; padding: 4px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--bg); }
+.cal-day:nth-child(7n) { border-right: none; }
+.cal-day.other-month { background: var(--bg-card); opacity: 0.5; }
+.cal-day.today { background: #1a2e1a; }
+.cal-day .day-num { font-size: 0.78em; color: var(--text-muted); padding: 2px 4px; }
+.cal-event { font-size: 0.72em; padding: 2px 5px; margin: 2px 0; border-radius: 3px; color: #fff; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-event:hover { opacity: 0.85; }
+.event-soil { background: #2e7d32; }
+.event-planting { background: #7cb342; }
+.event-plan { background: #f9a825; color: #333; }
+.legend { display: flex; gap: 16px; margin: 12px 0; font-size: 0.82em; }
+.legend-item { display: flex; align-items: center; gap: 4px; }
+.legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+.tooltip-c { display: none; position: fixed; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 12px; max-width: 320px; z-index: 999; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+.tooltip-c.show { display: block; }
+.tooltip-c h4 { margin: 0 0 4px; font-size: 0.9em; }
+.tooltip-c p { margin: 2px 0; font-size: 0.82em; color: var(--text-muted); }
+.weekend { background: rgba(255,255,255,0.02); }
+.stat-summary { display: flex; gap: 20px; margin-bottom: 16px; flex-wrap: wrap; }
+.stat-chip { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 8px 16px; font-size: 0.82em; }
+.stat-chip strong { font-size: 1.1em; }
+</style>
+
+<div class="cal-header">
+  <h2>Planning de Production</h2>
+  <div class="cal-nav">
+    <button onclick="navMonth(-1)">◀</button>
+    <span class="month-label" id="monthLabel"></span>
+    <button onclick="navMonth(1)">▶</button>
+    <button onclick="goToday()">Aujourd'hui</button>
+  </div>
+</div>
+
+<div class="filters">
+  <div><label>Zone</label><select id="f-zone" onchange="applyFilters()"><option value="">Toutes</option></select></div>
+  <div><label>Sous-zone</label><select id="f-subzone" onchange="applyFilters()"><option value="">Toutes</option></select></div>
+  <div><label>Produit</label><select id="f-product" onchange="applyFilters()"><option value="">Tous</option></select></div>
+  <div><label>Variété</label><select id="f-variety" onchange="applyFilters()"><option value="">Toutes</option></select></div>
+  <div><label>Type</label><select id="f-type" onchange="applyFilters()"><option value="">Tous</option><option value="soil">Sol</option><option value="planting">Plantation</option><option value="plan">Plan</option></select></div>
+</div>
+
+<div class="stat-summary" id="statSummary"></div>
+
+<div class="legend">
+  <span class="legend-item"><span class="legend-dot" style="background:#2e7d32"></span> Préparation sol</span>
+  <span class="legend-item"><span class="legend-dot" style="background:#7cb342"></span> Plantation</span>
+  <span class="legend-item"><span class="legend-dot" style="background:#f9a825"></span> Plan de production</span>
+</div>
+
+<div class="cal-grid" id="calGrid"></div>
+<div class="tooltip-c" id="tooltip"></div>
+
+<script>
+const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const DAYS = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+let currentYear = 2026;
+let currentMonth = 3;
+let allEvents = [];
+let facets = { zones:[], sub_zones:[], products:[], varieties:[] };
+
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m] || m); }
+
+async function loadCalendar() {
+  const params = new URLSearchParams();
+  ['zone','subzone','product','variety','type'].forEach(k => {
+    const v = document.getElementById('f-' + k).value;
+    if (v) params.set(k === 'type' ? 'type' : k === 'subzone' ? 'sub_zone' : k, v);
+  });
+  const q = params.toString() ? '?' + params.toString() : '';
+  const r = await fetch('/api/production/calendar' + q);
+  const d = await r.json();
+  allEvents = d.events;
+  facets = d.facets;
+  populateFilters();
+  renderCalendar();
+  renderStats();
+}
+
+function populateFilters() {
+  ['zone','subzone','product','variety'].forEach(k => {
+    const sel = document.getElementById('f-' + k);
+    const key = k === 'subzone' ? 'sub_zones' : k + 's';
+    const vals = facets[key] || [];
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">' + (k === 'zone' ? 'Toutes' : k === 'subzone' ? 'Toutes' : k === 'product' ? 'Tous' : 'Toutes') + '</option>' +
+      vals.map(v => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('');
+    sel.value = cur;
+  });
+}
+
+function renderStats() {
+  const el = document.getElementById('statSummary');
+  const byType = { soil: 0, planting: 0, plan: 0 };
+  allEvents.forEach(e => { byType[e.type] = (byType[e.type]||0) + 1; });
+  el.innerHTML = Object.entries(byType).map(([k,v]) => {
+    const label = { soil: 'Sols', planting: 'Plantations', plan: 'Plans' }[k] || k;
+    const color = { soil: '#2e7d32', planting: '#7cb342', plan: '#f9a825' }[k] || '#888';
+    return v ? `<span class="stat-chip"><strong style="color:${color}">${v}</strong> ${label}</span>` : '';
+  }).join('');
+}
+
+function renderCalendar() {
+  const grid = document.getElementById('calGrid');
+  const firstDay = new Date(currentYear, currentMonth, 1);
+  const lastDay = new Date(currentYear, currentMonth + 1, 0);
+  // Monday = 0
+  const startDow = (firstDay.getDay() + 6) % 7;
+  const daysInMonth = lastDay.getDate();
+  const prevMonthDays = new Date(currentYear, currentMonth, 0).getDate();
+
+  // Day headers
+  let html = DAYS.map(d => '<div class="cal-day-header">' + d + '</div>').join('');
+
+  // Empty cells for offset
+  for (let i = 0; i < startDow; i++) {
+    const pd = prevMonthDays - startDow + i + 1;
+    html += '<div class="cal-day other-month"><div class="day-num">' + pd + '</div></div>';
+  }
+
+  // Actual days
+  const today = new Date();
+  const isToday = (d) => today.getFullYear() === currentYear && today.getMonth() === currentMonth && today.getDate() === d;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const cls = 'cal-day' + (isToday(d) ? ' today' : '');
+    const dow = (startDow + d - 1) % 7;
+    const wkCls = (dow === 5 || dow === 6) ? ' weekend' : '';
+    const dateStr = sprintf('%04d-%02d-%02d', currentYear, currentMonth + 1, d);
+
+    const dayEvents = allEvents.filter(e => dateStr >= e.start && dateStr <= e.end);
+    let evHtml = '';
+    dayEvents.slice(0, 5).forEach(e => {
+      evHtml += `<div class="cal-event event-${esc(e.type)}" onclick="showTooltip(event,'${esc(e.id)}')">${esc(e.title)}</div>`;
+    });
+    if (dayEvents.length > 5) {
+      evHtml += `<div style="font-size:0.72em;color:var(--text-muted);padding:1px 4px">+${dayEvents.length-5} autres</div>`;
+    }
+
+    html += `<div class="${cls}${wkCls}" data-date="${dateStr}">`;
+    html += `<div class="day-num">${d}</div>${evHtml}</div>`;
+  }
+
+  // Fill remaining cells
+  const totalCells = startDow + daysInMonth;
+  const remaining = (7 - totalCells % 7) % 7;
+  for (let i = 1; i <= remaining; i++) {
+    html += '<div class="cal-day other-month"><div class="day-num">' + i + '</div></div>';
+  }
+
+  grid.innerHTML = html;
+  document.getElementById('monthLabel').textContent = MONTHS[currentMonth] + ' ' + currentYear;
+}
+
+function sprintf() {
+  let s = arguments[0];
+  for (let i = 1; i < arguments.length; i++) {
+    s = s.replace('%s', arguments[i]).replace('%d', arguments[i]);
+  }
+  return s;
+}
+
+function navMonth(delta) {
+  currentMonth += delta;
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  renderCalendar();
+}
+
+function goToday() {
+  const t = new Date();
+  currentYear = t.getFullYear();
+  currentMonth = t.getMonth();
+  renderCalendar();
+}
+
+function applyFilters() {
+  loadCalendar();
+}
+
+function showTooltip(event, id) {
+  const e = allEvents.find(x => x.id === id);
+  if (!e) return;
+  const tip = document.getElementById('tooltip');
+  let lines = `<h4>${esc(e.title)}</h4>`;
+  lines += `<p>${esc(e.subtitle)}</p>`;
+  if (e.zone) lines += `<p>📍 ${esc(e.zone)}${e.sub_zone ? ' / ' + esc(e.sub_zone) : ''}</p>`;
+  if (e.start) {
+    const endTxt = e.end !== e.start ? ' → ' + e.end.slice(5) : '';
+    lines += `<p>📅 ${e.start.slice(5)}${endTxt}</p>`;
+  }
+  if (e.area_m2) lines += `<p>📐 ${e.area_m2}m²</p>`;
+  if (e.plant_count) lines += `<p>🌱 ${e.plant_count} plants</p>`;
+  if (e.yield_kg) lines += `<p>🏋️ ${e.yield_kg} kg</p>`;
+  if (e.status) lines += `<p>🔵 ${esc(e.status)}</p>`;
+  tip.innerHTML = lines;
+  tip.style.left = (event.clientX + 10) + 'px';
+  tip.style.top = (event.clientY + 10) + 'px';
+  tip.classList.add('show');
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.cal-event')) {
+    document.getElementById('tooltip').classList.remove('show');
+  }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  const t = new Date();
+  currentYear = t.getFullYear();
+  currentMonth = t.getMonth();
+  // Nav link
+  const nav = document.querySelector('nav') || document.querySelector('.nav-links') || document.querySelector('ul');
+  if (nav) {
+    const a = document.createElement('a');
+    a.href = '/planning';
+    a.textContent = 'Planning';
+    a.style.margin = '0 8px';
+    nav.appendChild(a);
+  }
+  loadCalendar();
+  setInterval(loadCalendar, 60000);
+});
+</script>
+{% endblock %}

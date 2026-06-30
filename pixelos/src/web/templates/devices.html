@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}Périphériques - PixelOS{% endblock %}
+{% block content %}
+<style>
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+.card h3 { font-size: 13px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.card .value { font-size: 28px; font-weight: 700; }
+.card .value.green { color: var(--green); }
+.card .value.blue { color: var(--blue); }
+.card .value.red { color: var(--red); }
+.tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+.tab { padding: 10px 20px; cursor: pointer; font-size: 14px; color: var(--text-dim); border-bottom: 2px solid transparent; transition: 0.15s; }
+.tab.active { color: var(--text); border-bottom-color: var(--green); }
+.tab:hover { color: var(--text); }
+.panel { display: none; }
+.panel.active { display: block; }
+input, select, textarea { width: 100%; padding: 10px 12px; margin-bottom: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 14px; }
+label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.row { display: flex; gap: 12px; }
+.row > * { flex: 1; }
+.empty { color: var(--text-dim); text-align: center; padding: 40px 0; }
+table { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 8px; border-collapse: collapse; overflow: hidden; }
+th { text-align: left; padding: 10px 14px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); border-bottom: 1px solid var(--border); }
+td { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.badge.online { background: rgba(63,185,80,0.15); color: var(--green); }
+.badge.offline { background: rgba(139,148,158,0.15); color: var(--text-dim); }
+.badge.active { background: rgba(63,185,80,0.15); color: var(--green); }
+.badge.inactive { background: rgba(210,153,34,0.15); color: var(--orange); }
+.badge.retired { background: rgba(248,81,73,0.15); color: var(--red); }
+.modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; max-width: 500px; width: 90%; }
+.modal h2 { margin-bottom: 16px; font-size: 18px; }
+.signal-bar { display: inline-block; width: 60px; height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; vertical-align: middle; }
+.signal-bar .fill { height: 100%; border-radius: 4px; }
+.signal-bar .fill.good { background: var(--green); }
+.signal-bar .fill.warn { background: var(--orange); }
+.signal-bar .fill.bad { background: var(--red); }
+</style>
+
+<div class="toolbar">
+  <h2 style="flex:1;font-size:20px;"><span>&#x1F4E1;</span> Catalogue Périphériques</h2>
+  <select id="devStatusFilter" style="width:auto;" onchange="loadDevices()">
+    <option value="">Tous statuts</option>
+    <option value="actif">Actif</option>
+    <option value="inactif">Inactif</option>
+    <option value="retiré">Retiré</option>
+  </select>
+  <select id="devProtocolFilter" style="width:auto;" onchange="loadDevices()">
+    <option value="">Tous protocoles</option>
+    <option value="wifi">Wi-Fi</option>
+    <option value="ble">BLE</option>
+    <option value="zigbee">Zigbee</option>
+    <option value="lora">LoRa</option>
+    <option value="rs485">RS485</option>
+  </select>
+  <button class="btn-green" onclick="showModal('addDeviceModal')">+ Ajouter</button>
+  <button class="btn-blue" onclick="scanDevices()">&#x1F50D; Scanner</button>
+  <button class="btn-green" onclick="refreshAll()">&#x21bb;</button>
+</div>
+
+<div class="grid" id="statsGrid"></div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('list',this)">Liste</div>
+  <div class="tab" onclick="switchTab('scan',this)">Scan</div>
+</div>
+
+<div id="panel-list" class="panel active"><div class="empty">Chargement...</div></div>
+<div id="panel-scan" class="panel"><div class="empty">Lancez un scan pour voir les résultats</div></div>
+
+<div id="addDeviceModal" class="modal-bg" style="display:none;" onclick="if(event.target===this)hideModal('addDeviceModal')">
+  <div class="modal">
+    <h2>Ajouter un périphérique</h2>
+    <div class="row"><div><label>ID</label><input id="devId" placeholder="capteur_sol_01"></div>
+    <div><label>Type</label><select id="devType"><option value="capteur_sol">Capteur sol</option><option value="temperature">Température</option><option value="humidite">Humidité</option><option value="vanne">Vanne</option><option value="pompe">Pompe</option><option value="meteo">Météo</option><option value="pir">PIR</option><option value="gateway">Gateway</option></select></div></div>
+    <div class="row"><div><label>Protocole</label><select id="devProto"><option value="wifi">Wi-Fi</option><option value="ble">BLE</option><option value="zigbee">Zigbee</option><option value="lora">LoRa</option><option value="rs485">RS485</option></select></div>
+    <div><label>Fabricant</label><input id="devMfr" placeholder="PixelHardware"></div></div>
+    <div class="row"><div><label>Modèle</label><input id="devModel" placeholder="PH-2000"></div>
+    <div><label>Espace</label><input id="devSpace" placeholder="serre_a"></div></div>
+    <div class="row"><div><label>IP</label><input id="devIp" placeholder="192.168.0.50"></div>
+    <div><label>MAC</label><input id="devMac" placeholder="AA:BB:CC:DD:EE:FF"></div></div>
+    <div class="row"><button class="btn-green" onclick="addDevice()">Ajouter</button><button class="btn-red" onclick="hideModal('addDeviceModal')">Annuler</button></div>
+  </div>
+</div>
+
+<div id="detailModal" class="modal-bg" style="display:none;" onclick="if(event.target===this)hideModal('detailModal')">
+  <div class="modal" id="detailContent" style="min-width:400px;"></div>
+</div>
+
+<script>
+async function api(url, opts={}) {
+  const r = await fetch(url, { headers:{'Content-Type':'application/json'}, ...opts });
+  return r.json();
+}
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+  if (name === 'list') loadDevices();
+}
+function showModal(id) { document.getElementById(id).style.display = 'flex'; }
+function hideModal(id) { document.getElementById(id).style.display = 'none'; }
+
+async function refreshAll() {
+  const [stats] = await Promise.all([api('/api/devices/stats'), loadDevices()]);
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="card"><h3>Total</h3><div class="value blue">${stats.total || 0}</div></div>
+    <div class="card"><h3>Actifs</h3><div class="value green">${stats.active || 0}</div></div>
+    <div class="card"><h3>Inactifs</h3><div class="value orange">${stats.inactive || 0}</div></div>
+    <div class="card"><h3>En ligne</h3><div class="value green">${stats.online || 0}</div></div>
+    <div class="card"><h3>Hors ligne</h3><div class="value red">${stats.offline || 0}</div></div>
+    <div class="card"><h3>Protocoles</h3><div class="value">${Object.keys(stats.by_protocol || {}).length || 0}</div></div>`;
+}
+
+async function loadDevices() {
+  const status = document.getElementById('devStatusFilter').value;
+  const protocol = document.getElementById('devProtocolFilter').value;
+  let url = '/api/devices?';
+  if (status) url += 'status=' + status + '&';
+  if (protocol) url += 'protocol=' + protocol;
+  const data = await api(url);
+  const list = data.devices || data || [];
+  const container = document.getElementById('panel-list');
+  if (!list.length) { container.innerHTML = '<div class="empty">Aucun périphérique</div>'; return; }
+  container.innerHTML = `<table><tr><th>ID</th><th>Type</th><th>Protocole</th><th>Signal</th><th>Batterie</th><th>Statut</th><th></th></tr>${
+    list.map(d => {
+      const sig = d.signal_strength || 0;
+      const sigClass = sig > -60 ? 'good' : sig > -80 ? 'warn' : 'bad';
+      const sigPct = Math.min(100, Math.max(2, (sig + 100) * 2));
+      return `<tr>
+        <td style="font-family:monospace;font-size:12px;">${d.device_id || d.id || '—'}</td>
+        <td><span class="badge sensor">${d.device_type || d.type || '—'}</span></td>
+        <td style="font-size:12px;color:var(--text-dim);">${d.protocol || '—'}</td>
+        <td><div class="signal-bar"><div class="fill ${sigClass}" style="width:${sigPct}%"></div></div></td>
+        <td>${d.battery_level != null ? d.battery_level + '%' : '—'}</td>
+        <td><span class="badge ${d.status === 'actif' || d.status === 'en_ligne' ? 'online' : d.status === 'inactif' ? 'inactive' : 'retired'}">${d.status || d.state || '—'}</span></td>
+        <td><div style="display:flex;gap:4px;">
+          <button class="btn-blue btn-sm" onclick="viewDevice('${d.device_id || d.id}')">Détails</button>
+          <button class="btn-green btn-sm" onclick="actDevice('${d.device_id || d.id}')">Activer</button>
+        </div></td>
+      </tr>`;
+    }).join('')}</table>`;
+}
+
+async function viewDevice(id) {
+  const d = await api('/api/devices/' + id);
+  document.getElementById('detailContent').innerHTML = `
+    <h2 style="margin-bottom:8px;">${d.device_id || d.id || 'Périphérique'}</h2>
+    <table style="font-size:13px;"><tr><td style="color:var(--text-dim);">Type</td><td>${d.device_type || d.type || '—'}</td></tr>
+    <tr><td style="color:var(--text-dim);">Protocole</td><td>${d.protocol || '—'}</td></tr>
+    <tr><td style="color:var(--text-dim);">Fabricant</td><td>${d.manufacturer || '—'}</td></tr>
+    <tr><td style="color:var(--text-dim);">Modèle</td><td>${d.model || '—'}</td></tr>
+    <tr><td style="color:var(--text-dim);">Espace</td><td>${d.space_id || '—'}</td></tr>
+    <tr><td style="color:var(--text-dim);">IP</td><td style="font-family:monospace;">${d.ip_address || '—'}</td></tr>
+    <tr><td style="color:var(--text-dim);">MAC</td><td style="font-family:monospace;">${d.mac_address || '—'}</td></tr>
+    <tr><td style="color:var(--text-dim);">Signal</td><td>${d.signal_strength || '—'} dBm</td></tr>
+    <tr><td style="color:var(--text-dim);">Batterie</td><td>${d.battery_level != null ? d.battery_level + '%' : '—'}</td></tr>
+    <tr><td style="color:var(--text-dim);">Empreinte</td><td style="font-family:monospace;font-size:11px;">${(d.fingerprint || '—').slice(0,32)}...</td></tr>
+    <tr><td style="color:var(--text-dim);">Statut</td><td><span class="badge ${d.status === 'actif' ? 'online' : 'inactive'}">${d.status || '—'}</span></td></tr></table>
+    <div style="margin-top:16px;display:flex;gap:8px;">
+      <button class="btn-green btn-sm" onclick="provisionDevice('${d.device_id || d.id}')">Provisionner</button>
+      <button class="btn-red btn-sm" onclick="retireDevice('${d.device_id || d.id}')">Retirer</button>
+    </div>`;
+  showModal('detailModal');
+}
+
+async function addDevice() {
+  const body = { device_id: document.getElementById('devId').value, device_type: document.getElementById('devType').value, protocol: document.getElementById('devProto').value, manufacturer: document.getElementById('devMfr').value, model: document.getElementById('devModel').value, space_id: document.getElementById('devSpace').value, ip_address: document.getElementById('devIp').value, mac_address: document.getElementById('devMac').value };
+  if (!body.device_id) return;
+  await api('/api/devices', { method:'POST', body:JSON.stringify(body) });
+  hideModal('addDeviceModal'); refreshAll();
+}
+
+async function actDevice(id) {
+  await api('/api/devices/' + id + '/activate', { method:'POST' });
+  loadDevices();
+}
+
+async function provisionDevice(id) {
+  const space = prompt('Espace cible :');
+  if (!space) return;
+  await api('/api/devices/' + id + '/provision', { method:'POST', body:JSON.stringify({space_id: space}) });
+  hideModal('detailModal'); refreshAll();
+}
+
+async function retireDevice(id) {
+  if (!confirm('Retirer ce périphérique ?')) return;
+  await api('/api/devices/' + id + '/retire', { method:'POST' });
+  hideModal('detailModal'); refreshAll();
+}
+
+async function scanDevices() {
+  document.getElementById('panel-scan').innerHTML = '<div class="empty">Scan en cours...</div>';
+  const data = await api('/api/devices/scan', { method:'POST', body:JSON.stringify({timeout:15}) });
+  const devices = data.devices || data.discovered || [];
+  const container = document.getElementById('panel-scan');
+  if (!devices.length) { container.innerHTML = '<div class="empty">Aucun périphérique découvert</div>'; return; }
+  container.innerHTML = `<table><tr><th>ID</th><th>Type</th><th>Protocole</th><th>Signal</th><th></th></tr>${
+    devices.map(d => `<tr><td style="font-family:monospace;font-size:12px;">${d.device_id || d.id || '—'}</td>
+      <td><span class="badge sensor">${d.device_type || d.type || '—'}</span></td>
+      <td style="font-size:12px;color:var(--text-dim);">${d.protocol || '—'}</td>
+      <td>${d.signal_strength || '—'} dBm</td>
+      <td><button class="btn-green btn-sm" onclick="registerScanned('${d.device_id || d.id}')">Enregistrer</button></td></tr>`).join('')}</table>`;
+  loadDevices();
+}
+
+async function registerScanned(id) {
+  await api('/api/devices/' + id + '/activate', { method:'POST' });
+  loadDevices();
+}
+
+refreshAll();
+</script>
+{% endblock %}

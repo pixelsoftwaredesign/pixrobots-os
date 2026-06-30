@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Inventaire</h2>
+<div class="stats-grid" id="stats"></div>
+
+<h3 class="section-title">Tous les Lots</h3>
+<div class="toolbar">
+  <select id="statusFilter" onchange="loadBatches()">
+    <option value="">Tous les status</option>
+    <option value="labeled">Etiquete</option>
+    <option value="stored">Stocke</option>
+    <option value="distributed">Distribue</option>
+    <option value="sold">Vendu</option>
+  </select>
+  <button class="btn-blue" onclick="loadLabels()">Voir toutes les etiquettes</button>
+</div>
+<table id="batchesTable">
+  <thead>
+    <tr><th>Lot</th><th>Produit</th><th>Zone</th><th>Date</th><th>Poids kg</th><th>Valeur</th><th>Qualite</th><th>Status</th><th>Destination</th><th>Actions</th></tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<h3 class="section-title">Etiquettes</h3>
+<div id="labelsContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px"></div>
+
+<script>
+async function load() {
+  const r = await fetch('/api/harvest/inventory');
+  const inv = await r.json();
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-card"><div class="label">En culture (kg)</div><div class="value blue">${inv.en_culture_kg} kg</div></div>
+    <div class="stat-card"><div class="label">Pret vente (kg)</div><div class="value green">${inv.pret_vente_kg} kg</div></div>
+    <div class="stat-card"><div class="label">Distribue (kg)</div><div class="value" style="color:var(--orange)">${inv.distribue_kg} kg</div></div>
+    <div class="stat-card"><div class="label">Vendu (kg)</div><div class="value" style="color:var(--text-dim)">${inv.vendu_kg} kg</div></div>
+    <div class="stat-card"><div class="label">Stock total</div><div class="value green">${inv.total_stock_kg} kg</div></div>
+    <div class="stat-card"><div class="label">Valeur totale</div><div class="value" style="color:var(--orange)">${inv.valeur_totale.toFixed(2)}€</div></div>`;
+  loadBatches();
+}
+async function loadBatches() {
+  const status = document.getElementById('statusFilter').value;
+  const url = status ? '/api/harvest/batches?status='+status : '/api/harvest/batches';
+  const r = await fetch(url);
+  const batches = await r.json();
+  document.querySelector('#batchesTable tbody').innerHTML = batches.sort((a,b)=>b.harvest_date.localeCompare(a.harvest_date)).map(b =>
+    `<tr>
+      <td>${b.batch_id}</td><td>${b.product_id}</td><td>${b.zone_id}</td>
+      <td>${b.harvest_date}</td><td>${b.weight_kg}</td>
+      <td>${b.total_value.toFixed(2)}€</td>
+      <td><span class="badge ok">${b.quality_grade}</span></td>
+      <td><span class="badge ${b.status=='pending'?'offline':'online'}">${b.status}</span></td>
+      <td>${b.destination || '-'}</td>
+      <td>
+        <button class="btn-green" onclick="updateStatus('${b.batch_id}','stored')" ${b.status!='labeled'?'disabled':''}>Stocker</button>
+        <button class="btn-orange" onclick="updateStatus('${b.batch_id}','distributed')" ${b.status!='stored'?'disabled':''}>Distribuer</button>
+      </td>
+    </tr>`).join('');
+}
+async function updateStatus(batchId, status) {
+  const dest = status === 'distributed' ? prompt('Destination:') : '';
+  await fetch('/api/harvest/batches/'+batchId, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status, destination: dest || ''})});
+  load();
+}
+async function loadLabels() {
+  const r = await fetch('/api/harvest/batches');
+  const batches = await r.json();
+  let html = '';
+  for (const b of batches.filter(b => b.status !== 'pending')) {
+    const lr = await fetch('/api/harvest/labels/'+b.batch_id);
+    const labels = await lr.json();
+    for (const lbl of labels) {
+      html += `<div class="stat-card" style="font-size:13px">
+        <div style="font-weight:700;margin-bottom:8px">${lbl.product}</div>
+        <div style="color:var(--text-dim)">Lot: ${lbl.batch_id}</div>
+        <div>Variete: ${lbl.variety || '-'}</div>
+        <div>Zone: ${lbl.zone}</div>
+        <div>Poids: ${lbl.weight_kg}kg</div>
+        <div>Prix: ${lbl.unit_price.toFixed(2)}€/kg</div>
+        <div style="color:var(--orange);font-weight:600">Total: ${lbl.total.toFixed(2)}€</div>
+        <div>Date: ${lbl.harvest_date}</div>
+        <div>Qualite: ${lbl.quality}</div>
+        <div style="margin-top:8px;padding:8px;background:var(--bg);border-radius:4px;word-break:break-all;font-family:monospace;font-size:11px">
+          <strong>QR:</strong> ${lbl.qr_data}
+        </div>
+      </div>`;
+    }
+  }
+  document.getElementById('labelsContainer').innerHTML = html || '<p style="color:var(--text-dim)">Aucune etiquette</p>';
+}
+load();
+setInterval(load, 30000);
+</script>
+{% endblock %}

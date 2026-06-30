@@ -1,0 +1,627 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+:root { --prod-green: #2e7d32; --prod-lime: #7cb342; --prod-brown: #6d4c41; --prod-gold: #f9a825; --prod-bg: #f1f8e9; }
+.prod-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.prod-header h2 { margin: 0; color: var(--prod-green); }
+.prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.prod-card { background: var(--bg-card); border-radius: 8px; padding: 16px; border: 1px solid var(--border); }
+.prod-card .val { font-size: 1.8em; font-weight: 700; color: var(--prod-green); }
+.prod-card .lbl { font-size: 0.85em; color: var(--text-muted); margin-top: 4px; }
+.section-title { font-size: 1.1em; font-weight: 600; margin: 20px 0 12px; color: var(--prod-brown); border-bottom: 2px solid var(--border); padding-bottom: 6px; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.9em; }
+th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { background: var(--bg-card); color: var(--text-muted); font-weight: 600; position: sticky; top: 0; }
+.status-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.78em; font-weight: 600; }
+.status-planned { background: #e3f2fd; color: #1565c0; }
+.status-in_progress { background: #fff3e0; color: #e65100; }
+.status-completed { background: #e8f5e9; color: #2e7d32; }
+.status-active { background: #e8f5e9; color: #1b5e20; }
+.status-draft { background: #f3e5f5; color: #7b1fa2; }
+.btn { padding: 5px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.82em; font-weight: 600; }
+.btn-primary { background: var(--prod-green); color: white; }
+.btn-primary:hover { background: #1b5e20; }
+.btn-sm { padding: 3px 8px; font-size: 0.78em; }
+.btn-xs { padding: 2px 6px; font-size: 0.72em; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.btn-outline:hover { background: var(--bg-card); }
+.btn-link { background: transparent; border: none; color: var(--prod-green); text-decoration: underline; padding: 0; cursor: pointer; }
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
+.modal-content { background: var(--bg-card); margin: 40px auto; padding: 24px; max-width: 640px; border-radius: 8px; max-height: 85vh; overflow-y: auto; }
+.modal-content h3 { margin: 0 0 16px; }
+.modal-content h4 { margin: 12px 0 6px; color: var(--prod-brown); }
+.modal-content label { display: block; margin: 8px 0 4px; font-size: 0.9em; color: var(--text-muted); }
+.modal-content input, .modal-content select, .modal-content textarea { width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); box-sizing: border-box; }
+.modal-content textarea { resize: vertical; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.sub-row { background: var(--prod-bg); }
+.sub-row td { padding: 6px 10px; font-size: 0.82em; }
+.amend-item { display: inline-block; background: #e8f5e9; border-radius: 4px; padding: 1px 6px; margin: 1px; font-size: 0.78em; white-space: nowrap; }
+.activity-item { border-left: 3px solid var(--prod-lime); padding-left: 6px; margin: 2px 0; font-size: 0.82em; }
+.link-chip { display: inline-block; background: #e3f2fd; border-radius: 3px; padding: 1px 5px; font-size: 0.76em; margin: 1px; }
+.no-items { color: var(--text-muted); font-style: italic; font-size: 0.82em; }
+</style>
+
+<div class="prod-header">
+  <h2>Gestion de Production</h2>
+  <div>
+    <button class="btn btn-outline" onclick="loadAll()">Rafraîchir</button>
+    <button class="btn btn-primary" onclick="showModal('soilModal')">+ Préparation sol</button>
+    <button class="btn btn-primary" onclick="showModal('plantingModal')">+ Plantation</button>
+    <button class="btn btn-primary" onclick="showModal('planModal')">+ Plan</button>
+    <a href="/planning" class="btn btn-outline" style="text-decoration:none">📅 Planning</a>
+  </div>
+</div>
+
+<div class="prod-grid" id="kpiGrid"></div>
+
+<div class="toolbar">
+  <button class="btn btn-sm btn-outline" onclick="filterTab('soil')">Sols</button>
+  <button class="btn btn-sm btn-outline" onclick="filterTab('planting')">Plantations</button>
+  <button class="btn btn-sm btn-outline" onclick="filterTab('plan')">Plans</button>
+</div>
+
+<div class="section-title">Préparations du Sol</div>
+<div style="overflow-x:auto">
+<table id="soilTable"><thead><tr>
+  <th>ID</th><th>Nom</th><th>Zone</th><th>Type</th><th>Surface</th><th>Statut</th><th>Début</th><th>Amendements</th><th>Activités</th><th>Actions</th>
+</tr></thead><tbody id="soilBody"></tbody></table>
+</div>
+
+<div class="section-title">Plantations</div>
+<div style="overflow-x:auto">
+<table id="plantingTable"><thead><tr>
+  <th>ID</th><th>Nom</th><th>Produit</th><th>Plants</th><th>Méthode</th><th>Espacement</th><th>Statut</th><th>Paillage</th><th>Irrigation</th><th>Date</th><th>Actions</th>
+</tr></thead><tbody id="plantingBody"></tbody></table>
+</div>
+
+<div class="section-title">Plans de Production</div>
+<div style="overflow-x:auto">
+<table id="planTable"><thead><tr>
+  <th>ID</th><th>Nom</th><th>Saison</th><th>Année</th><th>Rendement</th><th>Statut</th><th>Préparation sol</th><th>Plantation</th><th>Début</th><th>Actions</th>
+</tr></thead><tbody id="planBody"></tbody></table>
+</div>
+
+{# Modals #}
+
+<!-- Soil: Create -->
+<div id="soilModal" class="modal"><div class="modal-content">
+  <h3>Nouvelle préparation du sol</h3>
+  <label>Nom</label><input id="s-name" placeholder="Préparation parcelle A">
+  <label>Zone</label><input id="s-space" placeholder="verger">
+  <label>Sous-zone</label><input id="s-subzone" placeholder="zone_a">
+  <label>Type</label>
+  <select id="s-type"><option>labour</option><option>decompaction</option><option>buttage</option><option>planche</option><option>sous-solage</option></select>
+  <label>Surface (m²)</label><input id="s-area" type="number" value="1000">
+  <label>Profondeur (cm)</label><input id="s-depth" type="number" value="20">
+  <label>Condition du sol</label><select id="s-condition"><option></option><option>sec</option><option>humide</option><option>frais</option></select>
+  <label>Texture</label><select id="s-texture"><option></option><option>limoneux</option><option>argileux</option><option>sableux</option><option>limono-argileux</option></select>
+  <label>Notes</label><textarea id="s-notes" rows="2"></textarea>
+  <div class="modal-actions">
+    <button class="btn btn-outline" onclick="hideModal('soilModal')">Annuler</button>
+    <button class="btn btn-primary" onclick="createSoil()">Créer</button>
+  </div>
+</div></div>
+
+<!-- Soil: Detail (amendments + activities) -->
+<div id="soilDetailModal" class="modal"><div class="modal-content">
+  <h3 id="soilDetailTitle">Détail préparation sol</h3>
+  <div id="soilDetailBody"></div>
+  <div class="modal-actions">
+    <button class="btn btn-outline" onclick="hideModal('soilDetailModal')">Fermer</button>
+  </div>
+</div></div>
+
+<!-- Soil: Add amendment -->
+<div id="amendModal" class="modal"><div class="modal-content">
+  <h3>Ajouter un amendement</h3>
+  <input type="hidden" id="amend-soil-id">
+  <label>Type d'amendement</label>
+  <select id="amend-type">
+    <option>compost</option><option>fumier</option><option>engrais_vert</option><option>chaux</option><option>gypse</option>
+    <option>sable</option><option>tourbe</option><option>vermicompost</option><option>biochar</option>
+  </select>
+  <label>Quantité (kg)</label><input id="amend-qty" type="number" value="100">
+  <label>Produit</label><input id="amend-product" placeholder="Nom du produit">
+  <label>Notes</label><textarea id="amend-notes" rows="2"></textarea>
+  <div class="modal-actions">
+    <button class="btn btn-outline" onclick="hideModal('amendModal')">Annuler</button>
+    <button class="btn btn-primary" onclick="addAmendment()">Ajouter</button>
+  </div>
+</div></div>
+
+<!-- Soil: Add activity -->
+<div id="activityModal" class="modal"><div class="modal-content">
+  <h3>Ajouter une activité</h3>
+  <input type="hidden" id="act-soil-id">
+  <label>Activité</label>
+  <select id="act-type">
+    <option>labour_profondeur</option><option>hersage</option><option>nivelage</option><option>buttage</option>
+    <option>enfouissement_amendement</option><option>irrigation_préparation</option>
+  </select>
+  <label>Détails</label><input id="act-details" placeholder="Détails">
+  <label>Durée (heures)</label><input id="act-hours" type="number" value="2" step="0.5">
+  <div class="modal-actions">
+    <button class="btn btn-outline" onclick="hideModal('activityModal')">Annuler</button>
+    <button class="btn btn-primary" onclick="addActivity()">Ajouter</button>
+  </div>
+</div></div>
+
+<!-- Planting Modal -->
+<div id="plantingModal" class="modal"><div class="modal-content">
+  <h3>Nouvelle plantation</h3>
+  <label>Nom</label><input id="p-name" placeholder="Pommiers nord">
+  <label>Zone</label><input id="p-space" placeholder="verger">
+  <label>Sous-zone</label><input id="p-subzone" placeholder="zone_a">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px">
+    <div><label>Produit</label><input id="p-product" placeholder="pommier_golden"></div>
+    <div><label>Variété</label><input id="p-variety" placeholder="Golden Delicious"></div>
+    <div><label>Porte-greffe</label><input id="p-rootstock" placeholder="M9"></div>
+    <div><label>Nombre de plants</label><input id="p-count" type="number" value="100"></div>
+    <div><label>Espacement interligne (m)</label><input id="p-spacing-m" type="number" step="0.1" value="4"></div>
+    <div><label>Espacement sur ligne (m)</label><input id="p-spacing-p" type="number" step="0.1" value="2"></div>
+  </div>
+  <label>Méthode</label>
+  <select id="p-method"><option>trou</option><option>butte</option><option>tranchée</option><option>plate-bande</option></select>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px">
+    <div><label>Tuteurage</label><select id="p-stake"><option>aucun</option><option>bois</option><option>métal</option><option>bambou</option></select></div>
+    <div><label>Paillage</label><select id="p-mulch"><option>aucun</option><option>paille</option><option>toile tissée</option><option>broyat</option><option>plastique</option></select></div>
+    <div><label>Irrigation</label><select id="p-irrigation"><option>aucun</option><option>goutte-à-goutte</option><option>micro-aspersion</option><option>gravitaire</option></select></div>
+    <div><label>Arrosage initial (L)</label><input id="p-water" type="number" value="10"></div>
+  </div>
+  <label>Date plantation</label><input id="p-date" type="date">
+  <label>Notes</label><textarea id="p-notes" rows="2"></textarea>
+  <div class="modal-actions">
+    <button class="btn btn-outline" onclick="hideModal('plantingModal')">Annuler</button>
+    <button class="btn btn-primary" onclick="createPlanting()">Créer</button>
+  </div>
+</div></div>
+
+<!-- Plan Modal -->
+<div id="planModal" class="modal"><div class="modal-content">
+  <h3>Nouveau plan de production</h3>
+  <label>Nom</label><input id="pl-name" placeholder="Production pommes 2026">
+  <label>Zone</label><input id="pl-space" placeholder="verger">
+  <label>Sous-zone</label><input id="pl-subzone" placeholder="zone_a">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px">
+    <div><label>Produit</label><input id="pl-product" placeholder="pommier_golden"></div>
+    <div><label>Nom produit</label><input id="pl-product-name" placeholder="Pommier Golden"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px">
+    <div><label>Saison</label><select id="pl-season"><option>printemps</option><option>été</option><option>automne</option><option>hiver</option></select></div>
+    <div><label>Année</label><input id="pl-year" type="number" value="2026"></div>
+  </div>
+  <label>Rendement estimé (kg)</label><input id="pl-yield" type="number" value="3000">
+  <label>Valeur estimée (€)</label><input id="pl-value" type="number" step="0.01" value="0">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px">
+    <div><label>Date début</label><input id="pl-start" type="date"></div>
+    <div><label>Date fin estimée</label><input id="pl-end" type="date"></div>
+  </div>
+  <label>Notes</label><textarea id="pl-notes" rows="2"></textarea>
+  <div class="modal-actions">
+    <button class="btn btn-outline" onclick="hideModal('planModal')">Annuler</button>
+    <button class="btn btn-primary" onclick="createPlan()">Créer</button>
+  </div>
+</div></div>
+
+<!-- Plan: Link soil prep -->
+<div id="linkSoilModal" class="modal"><div class="modal-content">
+  <h3>Lier une préparation sol au plan</h3>
+  <input type="hidden" id="link-soil-plan-id">
+  <label>Sélectionner la préparation sol</label>
+  <select id="link-soil-select"></select>
+  <div class="modal-actions">
+    <button class="btn btn-outline" onclick="hideModal('linkSoilModal')">Annuler</button>
+    <button class="btn btn-primary" onclick="linkSoilToPlan()">Lier</button>
+  </div>
+</div></div>
+
+<!-- Plan: Link planting -->
+<div id="linkPlantingModal" class="modal"><div class="modal-content">
+  <h3>Lier une plantation au plan</h3>
+  <input type="hidden" id="link-planting-plan-id">
+  <label>Sélectionner la plantation</label>
+  <select id="link-planting-select"></select>
+  <div class="modal-actions">
+    <button class="btn btn-outline" onclick="hideModal('linkPlantingModal')">Annuler</button>
+    <button class="btn btn-primary" onclick="linkPlantingToPlan()">Lier</button>
+  </div>
+</div></div>
+
+<!-- Plan: Detail -->
+<div id="planDetailModal" class="modal"><div class="modal-content">
+  <h3 id="planDetailTitle">Détail plan de production</h3>
+  <div id="planDetailBody"></div>
+  <div class="modal-actions">
+    <button class="btn btn-outline" onclick="hideModal('planDetailModal')">Fermer</button>
+  </div>
+</div></div>
+
+<script>
+let currentTab = 'soil';
+let soilPrepList = [];
+let plantingList = [];
+
+function showModal(id) { document.getElementById(id).style.display = 'block'; }
+function hideModal(id) { document.getElementById(id).style.display = 'none'; }
+
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, function(m) {
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m] || m; }); }
+
+function badge(status) {
+  const cls = 'status-' + status;
+  return `<span class="status-badge ${cls}">${esc(status)}</span>`;
+}
+
+function filterTab(tab) {
+  currentTab = tab;
+  document.getElementById('soilTable').style.display = tab === 'soil' ? '' : 'none';
+  document.getElementById('plantingTable').style.display = tab === 'planting' ? '' : 'none';
+  document.getElementById('planTable').style.display = tab === 'plan' ? '' : 'none';
+}
+
+async function loadAll() {
+  const d = await fetch('/api/production/dashboard').then(r => r.json());
+  soilPrepList = d.soil_preparations;
+  plantingList = d.plantings;
+  renderKPI(d.stats);
+  renderSoil(d.soil_preparations);
+  renderPlanting(d.plantings);
+  renderPlans(d.plans);
+}
+
+function renderKPI(s) {
+  const grid = document.getElementById('kpiGrid');
+  const cards = [
+    { val: s.active_plans, lbl: 'Plans actifs' },
+    { val: s.total_soil_preps, lbl: 'Préparations sol' },
+    { val: s.total_plantings, lbl: 'Plantations' },
+    { val: s.total_plants, lbl: 'Total plants' },
+    { val: s.total_amendments, lbl: 'Amendements' },
+    { val: s.estimated_total_yield_kg + ' kg', lbl: 'Rendement estimé' },
+    { val: Object.values(s.plans_by_status||{}).reduce((a,b)=>a+b, 0), lbl: 'Total plans' },
+    { val: s.total_plans, lbl: 'Plans saison' },
+  ];
+  grid.innerHTML = cards.map(c =>
+    `<div class="prod-card"><div class="val">${esc(c.val)}</div><div class="lbl">${esc(c.lbl)}</div></div>`
+  ).join('');
+}
+
+function renderSoil(items) {
+  const body = document.getElementById('soilBody');
+  body.innerHTML = items.map(s => {
+    const nAmend = (s.amendments||[]).length;
+    const nAct = (s.activities||[]).length;
+    const amendLabel = nAmend
+      ? (s.amendments||[]).map(a => `<span class="amend-item">${esc(a.type||a.amendment_type)} ${a.quantity_kg}kg</span>`).join(' ')
+      : '<span class="no-items">Aucun</span>';
+    const actLabel = nAct
+      ? (s.activities||[]).map(a => `<div class="activity-item">${esc(a.activity)}${a.details?' — '+esc(a.details):''} <small>${a.duration_hours}h</small></div>`).join('')
+      : '<span class="no-items">Aucune</span>';
+    return `<tr>
+      <td>${esc(s.id)}</td>
+      <td>${esc(s.name)}</td>
+      <td>${esc(s.space_id)}</td>
+      <td>${esc(s.preparation_type)}</td>
+      <td>${s.area_m2}m²</td>
+      <td>${badge(s.status)}</td>
+      <td>${(s.start_date||'').slice(0,10)}</td>
+      <td>${amendLabel}</td>
+      <td>${actLabel}</td>
+      <td>
+        <button class="btn btn-sm btn-outline" title="Détails" onclick="showSoilDetail('${s.id}')">📋</button>
+        <button class="btn btn-sm btn-outline" title="Ajouter amendement" onclick="showAmendModal('${s.id}')">🧪</button>
+        <button class="btn btn-sm btn-outline" title="Ajouter activité" onclick="showActivityModal('${s.id}')">🔧</button>
+        <button class="btn btn-sm btn-outline" onclick="updateStatus('soil','${s.id}','completed')">✓</button>
+        <button class="btn btn-sm btn-outline" onclick="deleteItem('soil','${s.id}')">✗</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderPlanting(items) {
+  const body = document.getElementById('plantingBody');
+  body.innerHTML = items.map(p => `<tr>
+    <td>${esc(p.id)}</td>
+    <td>${esc(p.name)}</td>
+    <td>${esc(p.product_name||p.product_id)}</td>
+    <td>${p.plant_count}</td>
+    <td>${esc(p.planting_method)}</td>
+    <td>${p.spacing_m}m × ${p.spacing_plant}m</td>
+    <td>${badge(p.status)}</td>
+    <td>${esc(p.mulch_type)}</td>
+    <td>${esc(p.irrigation_type)}</td>
+    <td>${(p.planting_date||'').slice(0,10)}</td>
+    <td>
+      <button class="btn btn-sm btn-outline" onclick="updateStatus('planting','${p.id}','completed')">✓</button>
+      <button class="btn btn-sm btn-outline" onclick="deleteItem('planting','${p.id}')">✗</button>
+    </td>
+  </tr>`).join('');
+}
+
+function renderPlans(items) {
+  const body = document.getElementById('planBody');
+  body.innerHTML = items.map(p => {
+    const hasSoil = p.soil_prep_id ? `<span class="link-chip">${esc(p.soil_prep_id)}</span>` : '<span class="no-items">—</span>';
+    const hasPlanting = p.planting_id ? `<span class="link-chip">${esc(p.planting_id)}</span>` : '<span class="no-items">—</span>';
+    return `<tr>
+      <td>${esc(p.id)}</td>
+      <td>${esc(p.name)}</td>
+      <td>${esc(p.season)}</td>
+      <td>${p.year}</td>
+      <td>${p.estimated_yield_kg} kg</td>
+      <td>${badge(p.status)}</td>
+      <td>${hasSoil}<br><button class="btn btn-xs btn-link" onclick="showLinkSoilModal('${p.id}')">+ Lier</button></td>
+      <td>${hasPlanting}<br><button class="btn btn-xs btn-link" onclick="showLinkPlantingModal('${p.id}')">+ Lier</button></td>
+      <td>${(p.start_date||'').slice(0,10)}</td>
+      <td>
+        <button class="btn btn-sm btn-outline" title="Détails" onclick="showPlanDetail('${p.id}')">📋</button>
+        <button class="btn btn-sm btn-outline" onclick="updateStatus('plan','${p.id}','active')">Activer</button>
+        <button class="btn btn-sm btn-outline" onclick="deleteItem('plan','${p.id}')">✗</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Soil Detail ──
+function showSoilDetail(id) {
+  const s = soilPrepList.find(x => x.id === id);
+  if (!s) return;
+  const title = document.getElementById('soilDetailTitle');
+  title.textContent = 'Détail: ' + s.name;
+  const body = document.getElementById('soilDetailBody');
+  body.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+      <div><strong>ID</strong><br>${esc(s.id)}</div>
+      <div><strong>Zone</strong><br>${esc(s.space_id)}${s.sub_zone_id?' / '+esc(s.sub_zone_id):''}</div>
+      <div><strong>Type</strong><br>${esc(s.preparation_type)}</div>
+      <div><strong>Surface</strong><br>${s.area_m2}m²</div>
+      <div><strong>Profondeur</strong><br>${s.depth_cm}cm</div>
+      <div><strong>Condition</strong><br>${esc(s.soil_condition||'—')}</div>
+      <div><strong>Texture</strong><br>${esc(s.texture||'—')}</div>
+      <div><strong>Statut</strong><br>${badge(s.status)}</div>
+      <div><strong>Début</strong><br>${(s.start_date||'').slice(0,10)}</div>
+      <div><strong>Fin</strong><br>${(s.completion_date||'').slice(0,10)||'—'}</div>
+    </div>
+    <h4>Amendements (${(s.amendments||[]).length})</h4>
+    ${(s.amendments||[]).length
+      ? '<table style="margin-bottom:12px"><tr><th>Type</th><th>Quantité</th><th>Produit</th><th>Notes</th></tr>' +
+        (s.amendments||[]).map(a => `<tr><td>${esc(a.type||a.amendment_type)}</td><td>${a.quantity_kg}kg</td><td>${esc(a.product_name||'')}</td><td>${esc(a.notes||'')}</td></tr>`).join('') +
+        '</table>'
+      : '<p class="no-items">Aucun amendement</p>'}
+    <h4>Activités (${(s.activities||[]).length})</h4>
+    ${(s.activities||[]).length
+      ? '<table><tr><th>Activité</th><th>Détails</th><th>Durée</th></tr>' +
+        (s.activities||[]).map(a => `<tr><td>${esc(a.activity)}</td><td>${esc(a.details||'')}</td><td>${a.duration_hours}h</td></tr>`).join('') +
+        '</table>'
+      : '<p class="no-items">Aucune activité</p>'}
+    <p><em>Notes:</em> ${esc(s.notes||'—')}</p>
+  `;
+  showModal('soilDetailModal');
+}
+
+// ── Plan Detail ──
+function showPlanDetail(id) {
+  const p = (soilPrepList.length > 0 ? null : null);
+  // fetch plan detail
+  fetch('/api/production/plans/' + id).then(r => r.json()).then(plan => {
+    const title = document.getElementById('planDetailTitle');
+    title.textContent = 'Détail: ' + plan.name;
+    const body = document.getElementById('planDetailBody');
+    const soilName = soilPrepList.find(s => s.id === plan.soil_prep_id);
+    const plantName = plantingList.find(p2 => p2.id === plan.planting_id);
+    const linkedSoil = plan.soil_prep_id
+      ? `<span class="link-chip">${esc(plan.soil_prep_id)}</span> ${soilName ? '— '+esc(soilName.name) : ''}`
+      : '<span class="no-items">Aucune</span>';
+    const linkedPlanting = plan.planting_id
+      ? `<span class="link-chip">${esc(plan.planting_id)}</span> ${plantName ? '— '+esc(plantName.name) : ''}`
+      : '<span class="no-items">Aucune</span>';
+    body.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+        <div><strong>ID</strong><br>${esc(plan.id)}</div>
+        <div><strong>Zone</strong><br>${esc(plan.space_id)}${plan.sub_zone_id?' / '+esc(plan.sub_zone_id):''}</div>
+        <div><strong>Produit</strong><br>${esc(plan.product_name||plan.product_id)}</div>
+        <div><strong>Saison</strong><br>${esc(plan.season)} ${plan.year}</div>
+        <div><strong>Rendement</strong><br>${plan.estimated_yield_kg} kg</div>
+        <div><strong>Valeur</strong><br>${plan.estimated_value||0} €</div>
+        <div><strong>Statut</strong><br>${badge(plan.status)}</div>
+        <div><strong>Période</strong><br>${(plan.start_date||'').slice(0,10)} → ${(plan.estimated_end_date||'').slice(0,10)}</div>
+      </div>
+      <h4>Préparation sol liée</h4>
+      <p>${linkedSoil}</p>
+      <h4>Plantation liée</h4>
+      <p>${linkedPlanting}</p>
+      <p><em>Notes:</em> ${esc(plan.notes||'—')}</p>
+    `;
+    showModal('planDetailModal');
+  });
+}
+
+// ── Add Amendment ──
+function showAmendModal(soilId) {
+  document.getElementById('amend-soil-id').value = soilId;
+  showModal('amendModal');
+}
+
+async function addAmendment() {
+  const soilId = document.getElementById('amend-soil-id').value;
+  const body = {
+    amendment_type: document.getElementById('amend-type').value,
+    quantity_kg: parseFloat(document.getElementById('amend-qty').value) || 0,
+    product_name: document.getElementById('amend-product').value,
+    notes: document.getElementById('amend-notes').value,
+  };
+  await fetch(`/api/production/soil/${soilId}/amend`, {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body),
+  });
+  hideModal('amendModal');
+  loadAll();
+}
+
+// ── Add Activity ──
+function showActivityModal(soilId) {
+  document.getElementById('act-soil-id').value = soilId;
+  showModal('activityModal');
+}
+
+async function addActivity() {
+  const soilId = document.getElementById('act-soil-id').value;
+  const body = {
+    activity: document.getElementById('act-type').value,
+    details: document.getElementById('act-details').value,
+    duration_hours: parseFloat(document.getElementById('act-hours').value) || 0,
+  };
+  await fetch(`/api/production/soil/${soilId}/activity`, {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body),
+  });
+  hideModal('activityModal');
+  loadAll();
+}
+
+// ── Link Soil to Plan ──
+async function showLinkSoilModal(planId) {
+  document.getElementById('link-soil-plan-id').value = planId;
+  const sel = document.getElementById('link-soil-select');
+  sel.innerHTML = '<option value="">Chargement...</option>';
+  try {
+    const soilList = await fetch('/api/production/soil').then(r => r.json());
+    sel.innerHTML = soilList.map(s =>
+      `<option value="${esc(s.id)}">${esc(s.id)} — ${esc(s.name)} (${esc(s.space_id)})</option>`
+    ).join('');
+  } catch(e) {
+    sel.innerHTML = '<option value="">Erreur chargement</option>';
+  }
+  showModal('linkSoilModal');
+}
+
+async function linkSoilToPlan() {
+  const planId = document.getElementById('link-soil-plan-id').value;
+  const soilId = document.getElementById('link-soil-select').value;
+  if (!soilId) { alert('Sélectionnez une préparation sol'); return; }
+  await fetch(`/api/production/plans/${planId}/link-soil`, {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({soil_prep_id: soilId}),
+  });
+  hideModal('linkSoilModal');
+  loadAll();
+}
+
+// ── Link Planting to Plan ──
+async function showLinkPlantingModal(planId) {
+  document.getElementById('link-planting-plan-id').value = planId;
+  const sel = document.getElementById('link-planting-select');
+  sel.innerHTML = '<option value="">Chargement...</option>';
+  try {
+    const plantList = await fetch('/api/production/planting').then(r => r.json());
+    sel.innerHTML = plantList.map(p =>
+      `<option value="${esc(p.id)}">${esc(p.id)} — ${esc(p.name)} (${esc(p.product_id)})</option>`
+    ).join('');
+  } catch(e) {
+    sel.innerHTML = '<option value="">Erreur chargement</option>';
+  }
+  showModal('linkPlantingModal');
+}
+
+async function linkPlantingToPlan() {
+  const planId = document.getElementById('link-planting-plan-id').value;
+  const plantingId = document.getElementById('link-planting-select').value;
+  if (!plantingId) { alert('Sélectionnez une plantation'); return; }
+  await fetch(`/api/production/plans/${planId}/link-planting`, {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({planting_id: plantingId}),
+  });
+  hideModal('linkPlantingModal');
+  loadAll();
+}
+
+// ── Create ──
+async function createSoil() {
+  const body = {
+    name: document.getElementById('s-name').value || 'sol',
+    space_id: document.getElementById('s-space').value,
+    sub_zone_id: document.getElementById('s-subzone').value,
+    preparation_type: document.getElementById('s-type').value,
+    area_m2: parseFloat(document.getElementById('s-area').value) || 0,
+    depth_cm: parseFloat(document.getElementById('s-depth').value) || 0,
+    soil_condition: document.getElementById('s-condition').value,
+    texture: document.getElementById('s-texture').value,
+    notes: document.getElementById('s-notes').value,
+  };
+  await fetch('/api/production/soil', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  hideModal('soilModal');
+  loadAll();
+}
+
+async function createPlanting() {
+  const body = {
+    name: document.getElementById('p-name').value || 'plantation',
+    space_id: document.getElementById('p-space').value,
+    sub_zone_id: document.getElementById('p-subzone').value,
+    product_id: document.getElementById('p-product').value,
+    variety: document.getElementById('p-variety').value,
+    rootstock: document.getElementById('p-rootstock').value,
+    plant_count: parseInt(document.getElementById('p-count').value) || 0,
+    spacing_m: parseFloat(document.getElementById('p-spacing-m').value) || 0,
+    spacing_plant: parseFloat(document.getElementById('p-spacing-p').value) || 0,
+    planting_method: document.getElementById('p-method').value,
+    stake_type: document.getElementById('p-stake').value,
+    mulch_type: document.getElementById('p-mulch').value,
+    irrigation_type: document.getElementById('p-irrigation').value,
+    initial_watering_l: parseFloat(document.getElementById('p-water').value) || 0,
+    planting_date: document.getElementById('p-date').value,
+    notes: document.getElementById('p-notes').value,
+  };
+  await fetch('/api/production/planting', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  hideModal('plantingModal');
+  loadAll();
+}
+
+async function createPlan() {
+  const body = {
+    name: document.getElementById('pl-name').value || 'plan',
+    space_id: document.getElementById('pl-space').value,
+    sub_zone_id: document.getElementById('pl-subzone').value,
+    product_id: document.getElementById('pl-product').value,
+    product_name: document.getElementById('pl-product-name').value,
+    season: document.getElementById('pl-season').value,
+    year: parseInt(document.getElementById('pl-year').value) || 2026,
+    estimated_yield_kg: parseFloat(document.getElementById('pl-yield').value) || 0,
+    estimated_value: parseFloat(document.getElementById('pl-value').value) || 0,
+    start_date: document.getElementById('pl-start').value,
+    estimated_end_date: document.getElementById('pl-end').value,
+    notes: document.getElementById('pl-notes').value,
+  };
+  await fetch('/api/production/plans', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  hideModal('planModal');
+  loadAll();
+}
+
+async function updateStatus(type, id, status) {
+  await fetch(`/api/production/${type}/${id}`, {
+    method: 'PUT',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({status}),
+  });
+  loadAll();
+}
+
+async function deleteItem(type, id) {
+  if (!confirm('Supprimer ?')) return;
+  await fetch(`/api/production/${type}/${id}`, { method: 'DELETE' });
+  loadAll();
+}
+
+//─ Nav link ─
+document.addEventListener('DOMContentLoaded', () => {
+  const nav = document.querySelector('nav') || document.querySelector('.nav-links') || document.querySelector('ul');
+  if (nav) {
+    const a = document.createElement('a');
+    a.href = '/production';
+    a.textContent = 'Production';
+    a.style.margin = '0 8px';
+    nav.appendChild(a);
+  }
+  loadAll();
+  setInterval(loadAll, 30000);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,25 @@
+[
+  {
+    "note_id": "DN-05065CD7",
+    "order_id": "DIST-EFB28919",
+    "client": "Marche Local",
+    "client_address": "12 Rue du Marche",
+    "date": "2026-06-29",
+    "lines": [
+      {
+        "product": "tomate_coeur_de_boeuf",
+        "quantity_kg": 10,
+        "unit_price": 4.5,
+        "total_ht": 45.0,
+        "calibre": "",
+        "lot": "BATCH-DE"
+      }
+    ],
+    "total_ht": 45.0,
+    "tva_pct": 5.5,
+    "total_ttc": 47.47,
+    "paid": true,
+    "paid_date": "2026-06-29",
+    "notes": ""
+  }
+]

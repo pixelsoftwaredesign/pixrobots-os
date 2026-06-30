@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Geothermal - PixelOS{% endblock %}
+{% block content %}
+<style>
+.geo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; }
+.geo-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 20px;
+}
+.geo-card .zone-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.geo-card .zone-name { font-size: 16px; font-weight: 700; }
+.geo-card .zone-temp { font-size: 36px; font-weight: 700; }
+.geo-card .zone-temp .unit { font-size: 18px; color: var(--text-dim); }
+.geo-card .zone-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; font-size: 13px; }
+.geo-card .zone-detail .label { color: var(--text-dim); }
+.geo-card .valve-bar {
+  height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; margin: 8px 0;
+}
+.geo-card .valve-bar .fill {
+  height: 100%; border-radius: 4px; transition: width 1s ease;
+}
+.geo-card .valve-bar .fill.heating { background: linear-gradient(90deg, var(--orange), var(--red)); }
+.geo-card .valve-bar .fill.cooling { background: linear-gradient(90deg, var(--blue), var(--orange)); }
+.geo-card .zone-controls { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.geo-card .zone-controls input { width: 70px; padding: 4px 8px; font-size: 13px; }
+.geo-card .zone-controls button { padding: 4px 12px; font-size: 12px; }
+.mode-badge {
+  display: inline-block; padding: 2px 10px; border-radius: 10px;
+  font-size: 11px; font-weight: 600;
+}
+.mode-badge.heating { background: rgba(248,81,73,0.15); color: var(--red); }
+.mode-badge.cooling { background: rgba(88,166,255,0.15); color: var(--blue); }
+.mode-badge.idle { background: rgba(139,148,158,0.15); color: var(--text-dim); }
+.summary-bar {
+  display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;
+}
+.summary-pill {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 20px; padding: 6px 16px; font-size: 13px;
+  display: flex; align-items: center; gap: 6px;
+}
+.summary-pill .num { font-weight: 700; }
+.summary-pill.heating .num { color: var(--red); }
+.summary-pill.cooling .num { color: var(--blue); }
+</style>
+
+<div class="summary-bar" id="summaryBar"></div>
+
+<div class="toolbar">
+  <button class="btn-blue" onclick="cycleAll()">Cycle manuel</button>
+  <span style="font-size:13px;color:var(--text-dim)" id="lastCycle"></span>
+</div>
+
+<div class="geo-grid" id="geoGrid"></div>
+
+<script>
+async function loadGeothermal() {
+  const r = await fetch('/api/geothermal');
+  const zones = await r.json();
+  const s = await (await fetch('/api/geothermal/summary')).json();
+  renderSummary(s);
+  renderZones(zones);
+}
+
+function renderSummary(s) {
+  document.getElementById('summaryBar').innerHTML = `
+    <span class="summary-pill"><span class="num">${s.total_zones}</span> Zones</span>
+    <span class="summary-pill heating"><span class="num">${s.heating_active}</span> Chauffage</span>
+    <span class="summary-pill cooling"><span class="num">${s.cooling_active}</span> Refroid.</span>
+    <span class="summary-pill"><span class="num">${s.avg_temp}</span> °C moyen</span>
+    <span class="summary-pill"><span class="num">${s.enabled}</span> Actives</span>
+  `;
+}
+
+function renderZones(zones) {
+  const container = document.getElementById('geoGrid');
+  container.innerHTML = zones.map(z => {
+    const modeClass = z.mode || 'idle';
+    const valvePct = z.valve_position || 0;
+    const isHeating = modeClass === 'heating';
+    const isCooling = modeClass === 'cooling';
+    const barColor = isHeating ? 'heating' : isCooling ? 'cooling' : '';
+    return `<div class="geo-card">
+      <div class="zone-header">
+        <span class="zone-name">${escHtml(z.label)}</span>
+        <span class="mode-badge ${modeClass}">${modeClass}</span>
+      </div>
+      <div class="zone-temp">${z.current_temp.toFixed(1)}<span class="unit">°C</span></div>
+      <div class="zone-detail">
+        <span><span class="label">Cible:</span> ${z.target_temp}°C</span>
+        <span><span class="label">Humidite:</span> ${z.current_humidity.toFixed(0)}%</span>
+        <span><span class="label">Hysteresis:</span> ${z.hysteresis}°C</span>
+        <span><span class="label">Vanne:</span> ${valvePct.toFixed(0)}%</span>
+      </div>
+      <div class="valve-bar">
+        <div class="fill ${barColor}" style="width:${valvePct}%"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-dim)">
+        PID: Kp=${z.pid.Kp} Ki=${z.pid.Ki} Kd=${z.pid.Kd}
+      </div>
+      <div class="zone-controls">
+        <input type="number" id="target_${z.zone_id}" value="${z.target_temp}" step="0.5" style="width:80px" placeholder="Cible">
+        <button class="btn-green" onclick="setTarget('${z.zone_id}')">Appliquer</button>
+        <button class="${z.enabled?'btn-orange':'btn-green'}" onclick="toggleZone('${z.zone_id}')">${z.enabled?'Desactiver':'Activer'}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function setTarget(zoneId) {
+  const val = document.getElementById('target_' + zoneId).value;
+  const r = await fetch('/api/geothermal/' + zoneId, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({target_temp: parseFloat(val)})
+  });
+  if (r.ok) { loadGeothermal(); }
+}
+
+async function toggleZone(zoneId) {
+  const r = await fetch('/api/geothermal/' + zoneId + '/toggle', {method:'POST'});
+  if (r.ok) { loadGeothermal(); }
+}
+
+async function cycleAll() {
+  document.getElementById('lastCycle').textContent = 'Cycle en cours...';
+  const r = await fetch('/api/geothermal/cycle', {method:'POST'});
+  if (r.ok) {
+    document.getElementById('lastCycle').textContent = 'Cycle: ' + new Date().toLocaleTimeString('fr-FR');
+    loadGeothermal();
+  }
+}
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+loadGeothermal();
+setInterval(loadGeothermal, 10000);
+</script>
+{% endblock %}

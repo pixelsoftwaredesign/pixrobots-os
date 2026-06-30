@@ -1,0 +1,91 @@
+{
+  "lines": [
+    {
+      "line_id": "serre_a_l1",
+      "zone_id": "serre_a",
+      "label": "Serre A - Ligne 1",
+      "product_id": "tomate_coeur_de_boeuf",
+      "plant_count": 20,
+      "planted_at": "2026-03-15",
+      "status": "active",
+      "expected_yield_kg": 50.0,
+      "estimated_value": 225.0,
+      "actual_yield_kg": 0,
+      "row_spacing_cm": 60,
+      "plant_spacing_cm": 40,
+      "notes": ""
+    },
+    {
+      "line_id": "serre_a_l2",
+      "zone_id": "serre_a",
+      "label": "Serre A - Ligne 2",
+      "product_id": "tomate_coeur_de_boeuf",
+      "plant_count": 18,
+      "planted_at": "2026-03-15",
+      "status": "active",
+      "expected_yield_kg": 45.0,
+      "estimated_value": 202.5,
+      "actual_yield_kg": 0,
+      "row_spacing_cm": 60,
+      "plant_spacing_cm": 40,
+      "notes": ""
+    },
+    {
+      "line_id": "serre_b_l1",
+      "zone_id": "serre_b",
+      "label": "Serre B - Ligne 1",
+      "product_id": "laitue_romaine",
+      "plant_count": 40,
+      "planted_at": "2026-04-01",
+      "status": "active",
+      "expected_yield_kg": 16.0,
+      "estimated_value": 44.8,
+      "actual_yield_kg": 0,
+      "row_spacing_cm": 30,
+      "plant_spacing_cm": 25,
+      "notes": ""
+    },
+    {
+      "line_id": "plein_champ_l1",
+      "zone_id": "plein_champ",
+      "label": "Plein Champ - Ligne 1",
+      "product_id": "pommier_golden",
+      "plant_count": 8,
+      "planted_at": "2024-11-01",
+      "status": "active",
+      "expected_yield_kg": 200.0,
+      "estimated_value": 640.0,
+      "actual_yield_kg": 0,
+      "row_spacing_cm": 400,
+      "plant_spacing_cm": 300,
+      "notes": ""
+    },
+    {
+      "line_id": "pepiniere_t1",
+      "zone_id": "pepiniere",
+      "label": "Pepiniere - Table 1",
+      "product_id": "basilic_grand_vert",
+      "plant_count": 30,
+      "planted_at": "2026-05-01",
+      "status": "active",
+      "expected_yield_kg": 9.0,
+      "estimated_value": 72.0,
+      "actual_yield_kg": 0,
+      "row_spacing_cm": 20,
+      "plant_spacing_cm": 15,
+      "notes": ""
+    }
+  ],
+  "batches": [],
+  "labels": [],
+  "inventory": {
+    "en_culture_kg": 320.0,
+    "pret_vente_kg": 0,
+    "distribue_kg": 0,
+    "vendu_kg": 0,
+    "total_stock_kg": 320.0,
+    "valeur_totale": 0,
+    "last_updated": null
+  },
+  "updated": "2026-06-30T05:58:28.944926"
+}

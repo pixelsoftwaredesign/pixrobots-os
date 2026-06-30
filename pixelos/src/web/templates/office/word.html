@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixel Word — Éditeur de rapports agricoles</title>
+<style>
+  :root {
+    --bg: #0a0e17; --card: #111827; --border: #1e293b;
+    --green: #22c55e; --text: #e2e8f0; --muted: #64748b;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+  }
+  .topbar {
+    display: flex; align-items: center; gap: 1rem;
+    padding: 0.75rem 1.5rem; background: var(--card);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar h2 span { color: var(--green); }
+  .topbar nav { display: flex; gap: 0.5rem; margin-left: auto; }
+  .topbar nav a { color: var(--muted); text-decoration: none; padding: 0.3rem 0.75rem; border-radius: 6px; font-size: 0.85rem; }
+  .topbar nav a:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+  .container { display: flex; height: calc(100vh - 48px); }
+  .sidebar {
+    width: 260px; background: var(--card); padding: 1rem;
+    border-right: 1px solid var(--border); overflow-y: auto;
+  }
+  .sidebar h3 { font-size: 0.7rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.05em; margin: 1rem 0 0.5rem; }
+  .doc-item {
+    padding: 0.5rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem;
+    margin-bottom: 0.25rem; transition: all 0.2s;
+  }
+  .doc-item:hover { background: rgba(255,255,255,0.05); }
+  .doc-item.active { background: rgba(34,197,94,0.1); color: var(--green); }
+  .doc-item .meta { font-size: 0.7rem; color: var(--muted); }
+  .main { flex: 1; display: flex; flex-direction: column; }
+  .toolbar {
+    display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--border); flex-wrap: wrap;
+  }
+  .toolbar button, .toolbar select {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--text); padding: 0.35rem 0.75rem; border-radius: 6px;
+    cursor: pointer; font-size: 0.8rem;
+  }
+  .toolbar button:hover { background: rgba(255,255,255,0.05); }
+  .toolbar .spacer { flex: 1; }
+  .editor-container { flex: 1; display: flex; }
+  .editor {
+    flex: 1; padding: 1.5rem; overflow-y: auto;
+  }
+  #title-input {
+    width: 100%; background: transparent; border: none; color: var(--text);
+    font-size: 1.5rem; font-weight: 700; padding: 0 0 1rem 0;
+    border-bottom: 1px solid var(--border); margin-bottom: 1rem;
+    font-family: inherit;
+  }
+  #title-input:focus { outline: none; border-color: var(--green); }
+  #content-editor {
+    width: 100%; min-height: 500px;
+    background: transparent; border: none; color: var(--text);
+    font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.9rem;
+    line-height: 1.7; resize: vertical;
+  }
+  #content-editor:focus { outline: none; }
+  .preview {
+    flex: 1; padding: 1.5rem; overflow-y: auto;
+    border-left: 1px solid var(--border);
+  }
+  .preview h1 { color: var(--green); font-size: 1.5rem; margin-bottom: 0.5rem; }
+  .preview h2 { color: var(--text); font-size: 1.2rem; margin: 1rem 0 0.5rem; }
+  .preview h3 { font-size: 1rem; margin: 0.75rem 0 0.25rem; }
+  .preview table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; font-size: 0.85rem; }
+  .preview th, .preview td { border: 1px solid var(--border); padding: 0.5rem; }
+  .preview th { background: var(--card); }
+  .preview .pixel-block { padding: 0.75rem; margin: 0.5rem 0; border-radius: 6px; background: rgba(34,197,94,0.05); border-left: 3px solid var(--green); font-size: 0.85rem; }
+  .status-bar { padding: 0.25rem 1rem; font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h2>📝 <span>Pixel</span> Word</h2>
+  <nav>
+    <a href="/office">Office</a>
+    <a href="/office/access">Access</a>
+    <a href="/office/excel">Excel</a>
+  </nav>
+</div>
+<div class="container">
+  <div class="sidebar">
+    <h3>📄 Documents</h3>
+    <button onclick="newDocument()" style="width:100%;padding:0.5rem;background:var(--green);color:#000;border:none;border-radius:6px;font-weight:600;cursor:pointer;margin-bottom:1rem;">+ Nouveau</button>
+    <div id="doc-list">Chargement...</div>
+  </div>
+  <div class="main">
+    <div class="toolbar">
+      <select id="template-select">
+        <option value="blank">📄 Vierge</option>
+        <option value="rapport-recolte">🌾 Rapport Récolte</option>
+        <option value="analyse-sol">🧪 Analyse Sol</option>
+        <option value="biodiversite">🌿 Fiche Biodiversité</option>
+        <option value="rapport-irrigation">💧 Rapport Irrigation</option>
+      </select>
+      <button onclick="saveDocument()">💾 Sauvegarder</button>
+      <button onclick="exportHTML()">📤 HTML</button>
+      <button onclick="pasteFromClipboard()">📋 Coller</button>
+      <span class="spacer"></span>
+      <span id="doc-meta" style="font-size:0.8rem;color:var(--muted)"></span>
+    </div>
+    <div class="editor-container">
+      <div class="editor">
+        <input id="title-input" placeholder="Titre du document..." value="Document sans titre">
+        <textarea id="content-editor" placeholder="Écrivez votre contenu en Markdown...&#10;&#10;# Titre&#10;&#10;## Sous-titre&#10;&#10;Texte avec **gras** et *italique*&#10;&#10;| Table | Exemple |&#10;|-------|---------|&#10;| A     | B       |"></textarea>
+      </div>
+      <div class="preview" id="preview">
+        <div style="color:var(--muted);font-size:0.85rem;">Aperçu en direct</div>
+      </div>
+    </div>
+    <div class="status-bar" id="status-bar">Prêt</div>
+  </div>
+</div>
+<script>
+let currentDocId = null;
+let autoSaveTimer = null;
+
+async function loadDocuments() {
+  const r = await fetch('/api/office/word/list');
+  const data = await r.json();
+  const list = document.getElementById('doc-list');
+  if (data.documents.length === 0) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;">Aucun document</div>';
+    return;
+  }
+  list.innerHTML = data.documents.map(d => `
+    <div class="doc-item" onclick="openDocument('${d.doc_id}')">
+      <div>${d.title}</div>
+      <div class="meta">${d.template} · ${(d.modified||'').slice(0,10)}</div>
+    </div>
+  `).join('');
+}
+
+async function newDocument() {
+  const template = document.getElementById('template-select').value;
+  const title = document.getElementById('title-input').value || 'Document';
+  const r = await fetch('/api/office/word/create', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({template, title, author: 'user'}),
+  });
+  const data = await r.json();
+  if (data.status === 'ok') {
+    await openDocument(data.doc_id);
+    document.getElementById('status-bar').textContent = '✅ Nouveau document créé';
+  }
+}
+
+async function openDocument(docId) {
+  document.querySelectorAll('.doc-item').forEach(el => el.classList.remove('active'));
+  const r = await fetch(`/api/office/word/open/${docId}`);
+  const data = await r.json();
+  if (data.status !== 'ok') return;
+  currentDocId = docId;
+  document.getElementById('title-input').value = data.document.title;
+  document.getElementById('content-editor').value = data.document.content;
+  document.getElementById('preview').innerHTML = data.rendered;
+  document.getElementById('doc-meta').textContent = `${data.document.template} · modifié ${(data.document.modified||'').slice(0,16)}`;
+  document.getElementById('status-bar').textContent = `Document: ${data.document.title}`;
+  // Highlight in sidebar
+  document.querySelectorAll('.doc-item').forEach(el => {
+    if (el.textContent.includes(data.document.doc_id) || el.onclick.toString().includes(docId)) {
+      el.classList.add('active');
+    }
+  });
+}
+
+async function saveDocument() {
+  if (!currentDocId) return;
+  const r = await fetch('/api/office/word/save', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      doc_id: currentDocId,
+      title: document.getElementById('title-input').value,
+      content: document.getElementById('content-editor').value,
+    }),
+  });
+  const data = await r.json();
+  document.getElementById('status-bar').textContent = data.status === 'ok' ? '💾 Sauvegardé' : '❌ Erreur';
+  if (data.status === 'ok') loadDocuments();
+}
+
+function updatePreview() {
+  const content = document.getElementById('content-editor').value;
+  let html = content
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>');
+  document.getElementById('preview').innerHTML = `<div class="preview-content">${html}</div>`;
+}
+
+// Auto-save
+document.getElementById('content-editor').addEventListener('input', () => {
+  updatePreview();
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(saveDocument, 10000);
+});
+document.getElementById('title-input').addEventListener('input', () => {
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(saveDocument, 10000);
+});
+
+async function pasteFromClipboard() {
+  const r = await fetch('/api/office/clipboard/paste?as=text');
+  const data = await r.json();
+  if (data.status === 'ok' && data.data) {
+    const editor = document.getElementById('content-editor');
+    editor.value += '\n\n' + (data.data.text || JSON.stringify(data.data, null, 2));
+    updatePreview();
+    document.getElementById('status-bar').textContent = '📋 Contenu collé depuis le presse-papier';
+  } else {
+    document.getElementById('status-bar').textContent = '📋 Presse-papier vide';
+  }
+}
+
+function exportHTML() {
+  const content = document.getElementById('preview').innerHTML;
+  const full = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${document.getElementById('title-input').value}</title><style>body{font-family:system-ui;padding:2cm;line-height:1.6;max-width:800px;margin:0 auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:8px}</style></head><body>${content}</body></html>`;
+  const blob = new Blob([full], {type: 'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${document.getElementById('title-input').value}.html`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+loadDocuments();
+updatePreview();
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+[
+  {
+    "entry_id": "ACC-8782749B",
+    "note_id": "DN-05065CD7",
+    "client": "Marche Local",
+    "date": "2026-06-29",
+    "total_ht": 45.0,
+    "tva": 2.48,
+    "total_ttc": 47.47,
+    "paid": true,
+    "paid_date": "2026-06-29",
+    "lines_count": 0,
+    "recorded": "2026-06-29T04:09:31.449363"
+  }
+]

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PixelOS — Téléchargement</title>
+<style>
+  :root {
+    --bg: #0a0e17; --card: #111827; --border: #1e293b;
+    --green: #22c55e; --orange: #f59e0b; --text: #e2e8f0; --muted: #64748b;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'Segoe UI', system-ui, monospace;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+  }
+  .hero { text-align: center; padding: 3rem 2rem 1rem; border-bottom: 1px solid var(--border); }
+  .hero h1 { font-size: 2.2rem; }
+  .hero h1 span { color: var(--green); }
+  .hero p { color: var(--muted); max-width: 600px; margin: 0.5rem auto; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 2rem; }
+  .arch-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin: 2rem 0; }
+  .arch-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.5rem; text-align: center; transition: border-color 0.3s;
+  }
+  .arch-card:hover { border-color: var(--green); }
+  .arch-card .icon { font-size: 3rem; margin-bottom: 0.5rem; }
+  .arch-card h3 { margin-bottom: 0.5rem; }
+  .arch-card p { color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem; }
+  .arch-card .tag {
+    display: inline-block; background: rgba(34,197,94,0.15); color: var(--green);
+    padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;
+    margin-bottom: 1rem;
+  }
+  .btn {
+    display: inline-block; background: var(--green); color: #000;
+    padding: 0.6rem 1.5rem; border-radius: 6px; text-decoration: none;
+    font-weight: 600; font-size: 0.9rem; transition: opacity 0.2s;
+  }
+  .btn:hover { opacity: 0.8; }
+  .btn.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .step { display: flex; gap: 1rem; margin-bottom: 1rem; align-items: flex-start; }
+  .step-num { background: var(--green); color: #000; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; flex-shrink: 0; }
+  .step-content h4 { margin-bottom: 0.25rem; }
+  .step-content code { color: var(--green); font-size: 0.85rem; }
+  .section-title { font-size: 1.2rem; margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  .mac-instructions { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; }
+</style>
+</head>
+<body>
+<div class="hero">
+  <h1>📥 <span>PixelOS</span> Téléchargement</h1>
+  <p>Choisissez votre plateforme pour rejoindre le réseau mondial de protection agricole</p>
+</div>
+<div class="container">
+  <div class="arch-grid">
+    <div class="arch-card">
+      <div class="icon">🍏</div>
+      <h3>Apple Silicon</h3>
+      <div class="tag">M1 • M2 • M3 • M4</div>
+      <p>Pour MacBook Air/Pro, Mac mini, iMac, Mac Studio, Mac Pro (2020+)</p>
+      <a href="#" class="btn secondary" id="dl-arm64">Télécharger ARM64</a>
+      <p style="margin-top:0.5rem;font-size:0.8rem;color:var(--muted)">Image miniroot + firmware EFI</p>
+    </div>
+    <div class="arch-card">
+      <div class="icon">💻</div>
+      <h3>Intel Mac</h3>
+      <div class="tag">AMD64</div>
+      <p>Pour Mac Intel (2006-2023), PC x86_64 standard</p>
+      <a href="#" class="btn" id="dl-amd64">Télécharger AMD64</a>
+      <p style="margin-top:0.5rem;font-size:0.8rem;color:var(--muted)">ISO bootable standard</p>
+    </div>
+    <div class="arch-card">
+      <div class="icon">📦</div>
+      <h3>macOS Installer</h3>
+      <div class="tag">.app</div>
+      <p>Application macOS à double-cliquer — télécharge et écrit l'image automatiquement</p>
+      <a href="#" class="btn secondary" id="dl-macapp">Télécharger .app</a>
+      <p style="margin-top:0.5rem;font-size:0.8rem;color:var(--muted)">macOS 11+ requis</p>
+    </div>
+  </div>
+
+  <h2 class="section-title">🍏 Guide Apple Silicon</h2>
+  <div class="mac-instructions">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h4>Télécharger l'image ARM64</h4>
+        <p>Cliquez sur le bouton ci-dessus ou utilisez:</p>
+        <code>curl -O https://dl.pixelos.org/iso/pixelos-latest-arm64.img</code>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <h4>Créer la clé USB bootable</h4>
+        <code># Identifier le disque<br>diskutil list<br># Écrire l'image (attention: efface tout le disque!)<br>sudo dd if=pixelos-latest-arm64.img of=/dev/rdisk2 bs=1m status=progress</code>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <h4>Démarrer sur Apple Silicon</h4>
+        <p><strong>Méthode 1 — Boot natif:</strong></p>
+        <code>1. Éteindre le Mac<br>2. Maintenir POWER enfoncé<br>3. Choisir "EFI Boot"</code>
+        <p style="margin-top:0.5rem;"><strong>Méthode 2 — Asahi Linux (dual-boot):</strong></p>
+        <code>curl -sL https://alx.sh | sh<br># Puis installer PixelOS dans la partition</code>
+        <p style="margin-top:0.5rem;"><strong>Méthode 3 — UTM (VM):</strong></p>
+        <code>1. Installer UTM depuis https://mac.getutm.app/<br>2. Nouvelle VM → OpenBSD → Choisir l'image</code>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <h4>Première connexion</h4>
+        <p>Connectez-vous en SSH ou via le navigateur:</p>
+        <code>ssh root@<ip>  (mot de passe: pixelos2024)<br>http://<ip>:9999  (interface web)<br>pixelos federation discover<br>pixelos portal join --nickname "Mon Mac" --country "FR"</code>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="section-title">🖥️ Guide Intel Mac / PC</h2>
+  <p style="color:var(--muted);margin-bottom:1rem;">Procédure identique mais avec l'ISO AMD64. Le démarrage se fait avec la touche Option (⌥) sur Mac, ou F12/DEL sur PC.</p>
+
+  <h2 class="section-title">📜 Vérification des signatures</h2>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1rem;margin-bottom:2rem;">
+    <code># Vérifier l'intégrité du téléchargement<br>shasum -a 256 pixelos-latest-*.img<br># Comparer avec le fichier .sha256 fourni</code>
+  </div>
+</div>
+<script>
+function setDownloadLink(id, arch) {
+  const el = document.getElementById(id);
+  if (el) {
+    const base = "https://dl.pixelos.org/iso/pixelos-latest-" + arch + (arch === "macapp" ? ".dmg" : arch === "arm64" ? ".img" : ".iso");
+    el.href = base;
+  }
+}
+setDownloadLink("dl-arm64", "arm64");
+setDownloadLink("dl-amd64", "amd64");
+</script>
+</body>
+</html>

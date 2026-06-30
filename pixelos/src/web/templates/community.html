@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PixelOS — Rejoindre la Communauté</title>
+<style>
+  :root {
+    --bg: #0a0e17;
+    --card: #111827;
+    --border: #1e293b;
+    --green: #22c55e;
+    --orange: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'Segoe UI', system-ui, monospace;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .hero {
+    text-align: center;
+    padding: 4rem 2rem 2rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero h1 { font-size: 2.5rem; }
+  .hero h1 span { color: var(--green); }
+  .hero p { color: var(--muted); max-width: 600px; margin: 1rem auto; font-size: 1.1rem; }
+  .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+  .step {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+  .step-num {
+    background: var(--green);
+    color: #000;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    flex-shrink: 0;
+    font-size: 0.9rem;
+  }
+  .step-content h3 { margin-bottom: 0.5rem; }
+  .step-content code {
+    background: rgba(255,255,255,0.05);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: var(--green);
+  }
+  .step-content .cmd {
+    display: block;
+    background: #000;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    margin: 0.75rem 0;
+    font-family: monospace;
+    border-left: 3px solid var(--green);
+    color: var(--green);
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+  }
+  .feature-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+  }
+  .feature-card .icon { font-size: 2rem; margin-bottom: 0.5rem; }
+  .feature-card h4 { margin-bottom: 0.5rem; }
+  .feature-card p { color: var(--muted); font-size: 0.9rem; }
+  .btn {
+    display: inline-block;
+    background: var(--green);
+    color: #000;
+    padding: 0.75rem 2rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    margin: 2rem 0;
+    transition: opacity 0.2s;
+  }
+  .btn:hover { opacity: 0.8; }
+  .section-title { font-size: 1.3rem; margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  .stats-row { display: flex; gap: 2rem; justify-content: center; margin: 2rem 0; flex-wrap: wrap; }
+  .stat { text-align: center; }
+  .stat .num { font-size: 2.5rem; font-weight: 700; color: var(--green); }
+  .stat .label { color: var(--muted); font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<div class="hero">
+  <h1>🌍 <span>PixelOS</span> Communauté</h1>
+  <p>Rejoignez le réseau mondial décentralisé de protection de la biodiversité agricole. Chaque nœud contribue à la préservation des semences et des races rares.</p>
+  <a href="/federation" class="btn">🌐 Voir la carte du réseau</a>
+</div>
+<div class="container">
+  <div class="stats-row" id="stats">
+    <div class="stat"><div class="num" id="stat-nodes">-</div><div class="label">Nœuds actifs</div></div>
+    <div class="stat"><div class="num" id="stat-countries">-</div><div class="label">Pays</div></div>
+    <div class="stat"><div class="num" id="stat-species">-</div><div class="label">Espèces protégées</div></div>
+    <div class="stat"><div class="num" id="stat-members">-</div><div class="label">Membres association</div></div>
+  </div>
+
+  <h2 class="section-title">🚀 Rejoindre le réseau en 5 minutes</h2>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <h3>Télécharger PixelOS</h3>
+      <p>Téléchargez l'ISO Appliance ou installez sur OpenBSD existant</p>
+      <span class="cmd" id="iso-url">curl -O https://dl.pixelos.org/iso/pixelos-latest.iso</span>
+      <code>SHA256: a1b2c3d4e5f6... (vérifier l'intégrité)</code>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <h3>Installer sur votre matériel</h3>
+      <p>Flashez l'ISO sur une clé USB (8 Go+) et démarrez le PC</p>
+      <span class="cmd"># Sous Linux/Mac<br>dd if=pixelos-latest.iso of=/dev/sdX bs=4M status=progress</span>
+      <p><strong>Matériel recommandé :</strong> Raspberry Pi 5 (4 Go+), Intel NUC, ou tout PC x86_64 recyclé</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <h3>Premier démarrage automatique</h3>
+      <p>Le nœud PixelOS se configure automatiquement : identité, clés cryptographiques, services</p>
+      <span class="cmd">Node ID: 9ca829e50dc20d39<br>Console: http://192.168.x.x:9999<br>SSH: ssh root@pixelos-xxxx.pxl</span>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <h3>Rejoindre la fédération</h3>
+      <p>Annoncez votre nœud au réseau mondial et découvrez les autres membres</p>
+      <span class="cmd">pixelos federation discover<br>pixelos federation mesh-connect<br>pixelos portal join --nickname "MaFerme" --country "MA"</span>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-content">
+      <h3>Contribuer à la biodiversité</h3>
+      <p>Enregistrez les espèces et races que vous protégez, partagez les données publiques</p>
+      <span class="cmd">pixelos federation species-create \
+  --scientific-name "Argania spinosa" \
+  --common-name "Arganier" \
+  --conservation-status "vulnerable" \
+  --country "MA"</span>
+    </div>
+  </div>
+
+  <h2 class="section-title">🛡️ Ce que vous obtenez</h2>
+  <div class="grid-3">
+    <div class="feature-card">
+      <div class="icon">🔐</div>
+      <h4>Données souveraines</h4>
+      <p>Vous contrôlez vos données. Rien n'est partagé sans votre consentement. 3 niveaux de confidentialité.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🌐</div>
+      <h4>Réseau maillé P2P</h4>
+      <p>WireGuard mesh entre tous les nœuds. Aucun point central. Résistant à la censure.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🧬</div>
+      <h4>Banque génomique mondiale</h4>
+      <p>Partagez et accédez aux données de séquençage des semences et races rares via IPFS.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🤝</div>
+      <h4>Gouvernance communautaire</h4>
+      <p>Chaque membre vote les décisions. Consensus 67% pour les mises à jour du réseau.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">📡</div>
+      <h4>IoT + IA</h4>
+      <p>Capteurs agricoles, irrigation intelligente, prédiction climatique, ONNX quantifié.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">📦</div>
+      <h4>Auto-hébergement simple</h4>
+      <p>ISO clé en main. Un vieux PC suffit. Installation automatique au premier boot.</p>
+    </div>
+  </div>
+
+  <h2 class="section-title">📜 Charte de l'Association</h2>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.5rem;margin-bottom:2rem;">
+    <ol style="padding-left:1.5rem;color:var(--muted);">
+      <li style="margin-bottom:0.75rem;"><strong>Souveraineté</strong> — Chaque membre reste propriétaire de ses données agricoles</li>
+      <li style="margin-bottom:0.75rem;"><strong>Open Science</strong> — Les données de biodiversité publique sont libres et gratuites</li>
+      <li style="margin-bottom:0.75rem;"><strong>Protection</strong> — Les semences et races rares ne peuvent être brevetées par des firmes</li>
+      <li style="margin-bottom:0.75rem;"><strong>Décentralisation</strong> — Aucune autorité centrale ne contrôle le réseau</li>
+      <li style="margin-bottom:0.75rem;"><strong>Consensus</strong> — Les décisions majeures sont validées par la communauté (67%)</li>
+      <li style="margin-bottom:0.75rem;"><strong>Savoirs ancestraux</strong> — Les connaissances traditionnelles sont protégées (confidentialité niveau 4)</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+async function loadStats() {
+  try {
+    const r = await fetch('/api/portal/stats');
+    const data = await r.json();
+    document.getElementById('stat-nodes').textContent = data.total_nodes || 0;
+    document.getElementById('stat-countries').textContent = data.total_countries || 0;
+  } catch {}
+  try {
+    const r2 = await fetch('/api/biodiversity/stats');
+    const d2 = await r2.json();
+    document.getElementById('stat-species').textContent = d2.total || 0;
+  } catch {}
+  try {
+    const r3 = await fetch('/api/gov/status');
+    const d3 = await r3.json();
+    document.getElementById('stat-members').textContent = d3.members || 0;
+  } catch {}
+  try {
+    const r4 = await fetch('/api/portal/iso');
+    const d4 = await r4.json();
+    if (d4.url) document.getElementById('iso-url').textContent = 'curl -O ' + d4.url;
+  } catch {}
+}
+loadStats();
+</script>
+</body>
+</html>

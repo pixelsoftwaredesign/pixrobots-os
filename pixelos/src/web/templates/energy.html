@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Energy - PixelOS{% endblock %}
+{% block content %}
+<style>
+.en-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.en-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 20px;
+}
+.en-card .card-header { font-size: 13px; color: var(--text-dim); margin-bottom: 4px; }
+.en-card .card-value { font-size: 32px; font-weight: 700; }
+.en-card .card-value .unit { font-size: 16px; color: var(--text-dim); }
+.en-card .card-sub { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+.bar-chart { display: flex; gap: 2px; align-items: flex-end; height: 60px; margin-top: 12px; }
+.bar-chart .bar {
+  flex: 1; border-radius: 2px 2px 0 0; min-height: 2px;
+  background: var(--orange); transition: height 0.5s;
+}
+.bar-chart .bar.night { background: var(--blue); }
+.en-table { width: 100%; font-size: 13px; border-collapse: collapse; }
+.en-table th { text-align: left; padding: 6px 8px; color: var(--text-dim); border-bottom: 1px solid var(--border); }
+.en-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.load-on { color: var(--green); }
+.load-off { color: var(--text-dim); }
+.load-throttled { color: var(--orange); }
+.state-badge {
+  display: inline-block; padding: 1px 8px; border-radius: 8px; font-size: 11px; font-weight: 600;
+}
+.state-badge.on { background: rgba(63,185,80,0.15); color: var(--green); }
+.state-badge.off { background: rgba(139,148,158,0.15); color: var(--text-dim); }
+.state-badge.throttled { background: rgba(248,81,73,0.15); color: var(--orange); }
+.prio-critical { color: var(--red); font-weight: 700; }
+.prio-high { color: var(--orange); }
+.prio-medium { color: var(--text-dim); }
+.prio-low { color: var(--text-dim); font-style: italic; }
+.soc-bar {
+  height: 12px; background: var(--bg); border-radius: 6px; overflow: hidden; margin: 8px 0;
+}
+.soc-bar .fill { height: 100%; border-radius: 6px; transition: width 1s; }
+.soc-bar .fill.good { background: linear-gradient(90deg, var(--green), var(--orange)); }
+.soc-bar .fill.warning { background: linear-gradient(90deg, var(--orange), var(--red)); }
+.soc-bar .fill.critical { background: var(--red); }
+</style>
+
+<div class="toolbar" style="margin-bottom:12px">
+  <button class="btn-blue" onclick="runCycle()">Cycle manuel</button>
+  <span style="font-size:13px;color:var(--text-dim)" id="lastCycle"></span>
+  <button class="btn-green" style="margin-left:8px" onclick="toggleGrid()">Reseau</button>
+</div>
+
+<div class="en-grid" id="summaryGrid"></div>
+
+<div class="en-grid" style="margin-top:16px">
+  <div class="en-card" style="grid-column:span 2">
+    <div class="card-header">Prevision solaire 24h</div>
+    <div class="bar-chart" id="forecastChart"></div>
+  </div>
+</div>
+
+<div class="en-grid" style="margin-top:16px">
+  <div class="en-card" style="grid-column:span 2">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span class="card-header">Charges electriques</span>
+      <span class="card-header" id="loadTotal"></span>
+    </div>
+    <table class="en-table" id="loadsTable">
+      <thead><tr><th>Charge</th><th>Puissance</th><th>Etat</th><th>Priorite</th><th>Action</th></tr></thead>
+      <tbody id="loadsBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+async function loadEnergy() {
+  const [summary, battery, loads, forecast, history] = await Promise.all([
+    fetch('/api/energy').then(r=>r.json()),
+    fetch('/api/energy/battery').then(r=>r.json()),
+    fetch('/api/energy/loads').then(r=>r.json()),
+    fetch('/api/energy/forecast?hours=24').then(r=>r.json()),
+    fetch('/api/energy/history?limit=60').then(r=>r.json()),
+  ]);
+  renderSummary(summary, battery);
+  renderForecast(forecast);
+  renderLoads(loads);
+  renderHistory(history);
+}
+
+function renderSummary(s, b) {
+  const grid = document.getElementById('summaryGrid');
+  const socClass = b.soc_pct > 40 ? 'good' : b.soc_pct > 20 ? 'warning' : 'critical';
+  grid.innerHTML = `
+    <div class="en-card">
+      <div class="card-header">Production solaire</div>
+      <div class="card-value">${s.current_solar_w}<span class="unit"> W</span></div>
+      <div class="card-sub">${s.peak_panel_kw}kWc installe / ${s.irradiance} W/m2</div>
+    </div>
+    <div class="en-card">
+      <div class="card-header">Consommation</div>
+      <div class="card-value">${s.current_load_w}<span class="unit"> W</span></div>
+      <div class="card-sub">${s.active_loads}/${s.loads} charges actives</div>
+    </div>
+    <div class="en-card">
+      <div class="card-header">Batterie</div>
+      <div class="card-value">${b.soc_pct}<span class="unit">%</span></div>
+      <div class="soc-bar"><div class="fill ${socClass}" style="width:${b.soc_pct}%"></div></div>
+      <div class="card-sub">${b.capacity_kwh}kWh / ${Math.abs(b.current_power_w)}W${b.current_power_w > 0 ? ' charge' : b.current_power_w < 0 ? ' decharge' : ''}</div>
+    </div>
+    <div class="en-card">
+      <div class="card-header">Reseau electrique</div>
+      <div class="card-value">${s.grid_available ? '<span style="color:var(--green)">Connecte</span>' : '<span style="color:var(--text-dim)">Hors ligne</span>'}</div>
+      <div class="card-sub">Autonomie solaire + batterie</div>
+    </div>
+  `;
+}
+
+function renderForecast(forecast) {
+  const chart = document.getElementById('forecastChart');
+  const maxKw = Math.max(...forecast.map(f => f.estimated_kw), 0.1);
+  chart.innerHTML = forecast.map(f => {
+    const pct = (f.estimated_kw / maxKw) * 100;
+    const h = parseInt(f.hour.slice(-5, -3));
+    const night = h < 7 || h > 20;
+    return `<div class="bar ${night ? 'night' : ''}" style="height:${Math.max(2, pct)}%" title="${f.hour}: ${f.estimated_kw}kW"></div>`;
+  }).join('');
+}
+
+function renderLoads(loads) {
+  const tbody = document.getElementById('loadsBody');
+  let total = 0;
+  tbody.innerHTML = loads.map(l => {
+    total += l.current_draw_w;
+    return `<tr>
+      <td>${escHtml(l.label)}</td>
+      <td>${l.current_draw_w}W / ${l.nominal_w}W max</td>
+      <td><span class="state-badge ${l.state}">${l.state}</span></td>
+      <td class="prio-${l.priority}">${l.priority}</td>
+      <td>
+        <button class="btn-green" style="padding:2px 8px;font-size:11px" onclick="setLoad('${l.load_id}','on')">ON</button>
+        <button class="btn-orange" style="padding:2px 8px;font-size:11px" onclick="setLoad('${l.load_id}','off')">OFF</button>
+      </td>
+    </tr>`;
+  }).join('');
+  document.getElementById('loadTotal').textContent = total + 'W total';
+}
+
+function renderHistory(history) {
+  // placeholder for sparkline or mini chart
+}
+
+async function runCycle() {
+  document.getElementById('lastCycle').textContent = 'Cycle en cours...';
+  const r = await fetch('/api/energy/cycle', {method:'POST'});
+  if (r.ok) {
+    document.getElementById('lastCycle').textContent = 'Cycle: ' + new Date().toLocaleTimeString('fr-FR');
+    loadEnergy();
+  }
+}
+
+async function setLoad(loadId, state) {
+  await fetch('/api/energy/loads/' + loadId, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({state: state})
+  });
+  loadEnergy();
+}
+
+async function toggleGrid() {
+  const s = await fetch('/api/energy').then(r=>r.json());
+  await fetch('/api/energy/grid', {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({available: !s.grid_available, power_w: 5000})
+  });
+  loadEnergy();
+}
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+loadEnergy();
+setInterval(loadEnergy, 15000);
+</script>
+{% endblock %}

@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}PixBackup — Sauvegarde Décentralisée{% endblock %}
+{% block head %}
+<style>
+.tab-bar { display:flex; gap:4px; margin-bottom:16px; flex-wrap:wrap; }
+.tab-btn { padding:8px 18px; border:none; border-radius:8px 8px 0 0; cursor:pointer; background:#1a1a2e; color:#888; font-size:13px; }
+.tab-btn.active { background:#e94560; color:#fff; }
+.backup-item { padding:12px; margin:8px 0; border-radius:8px; background:#16213e; border-left:3px solid #0f3460; }
+.backup-item .label { font-weight:bold; }
+.backup-item .meta { font-size:12px; color:#888; }
+pre.key-box { background:#0a0a1a; padding:12px; border-radius:8px; font-size:11px; max-height:200px; overflow:auto; word-break:break-all; }
+</style>
+{% endblock %}
+{% block content %}
+<h1><span style="color:#e94560;">PixBackup</span> <small style="font-size:16px;color:#888;">Sauvegarde Décentralisée</small></h1>
+<p>Chiffrement AES + Sharding + Reed-Solomon. Données distribuées sur le réseau maillé.</p>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab(this,'backup')">💾 Sauvegarder</button>
+  <button class="tab-btn" onclick="switchTab(this,'restore')">📂 Restaurer</button>
+  <button class="tab-btn" onclick="switchTab(this,'list')">📋 Liste</button>
+  <button class="tab-btn" onclick="switchTab(this,'key')">🔑 Clé Maître</button>
+  <button class="tab-btn" onclick="switchTab(this,'distribute')">🌐 Distribuer</button>
+</div>
+
+<div id="tab-backup" class="tab-content">
+  <div class="card">
+    <h3>💾 Nouvelle sauvegarde</h3>
+    <input type="text" id="backup-path" placeholder="Chemin du fichier/dossier" style="width:100%;padding:8px;margin:4px 0;border-radius:4px;background:#16213e;color:#e0e0e0;border:1px solid #0f3460;">
+    <input type="text" id="backup-label" placeholder="Étiquette (ex: base_plantes_2026)" style="width:100%;padding:8px;margin:4px 0;border-radius:4px;background:#16213e;color:#e0e0e0;border:1px solid #0f3460;">
+    <button class="btn" onclick="doBackup()">🔐 Chiffrer & Sauvegarder</button>
+    <div id="backup-result" style="margin-top:8px;"></div>
+  </div>
+</div>
+
+<div id="tab-restore" class="tab-content" style="display:none;">
+  <div class="card">
+    <h3>📂 Restaurer une sauvegarde</h3>
+    <input type="text" id="restore-id" placeholder="Backup ID" style="width:100%;padding:8px;margin:4px 0;border-radius:4px;background:#16213e;color:#e0e0e0;border:1px solid #0f3460;">
+    <input type="text" id="restore-output" placeholder="Chemin de sortie (optionnel)" style="width:100%;padding:8px;margin:4px 0;border-radius:4px;background:#16213e;color:#e0e0e0;border:1px solid #0f3460;">
+    <button class="btn" onclick="doRestore()">🔓 Déchiffrer & Restaurer</button>
+    <div id="restore-result" style="margin-top:8px;"></div>
+  </div>
+</div>
+
+<div id="tab-list" class="tab-content" style="display:none;">
+  <div class="card">
+    <h3>📋 Sauvegardes</h3>
+    <div id="backup-list"></div>
+  </div>
+  <div class="card">
+    <h3>📊 Statistiques</h3>
+    <div id="backup-stats"></div>
+  </div>
+</div>
+
+<div id="tab-key" class="tab-content" style="display:none;">
+  <div class="card">
+    <h3>🔑 Clé Maître</h3>
+    <p style="font-size:13px;color:#e94560;">⚠️ Sans cette clé, la restauration est IMPOSSIBLE. Gardez-la hors ligne.</p>
+    <pre class="key-box" id="key-display">Chargement...</pre>
+    <button class="btn" onclick="exportKey()">📤 Exporter</button>
+    <button class="btn" onclick="document.getElementById('key-import-input').click()">📥 Importer</button>
+    <input type="file" id="key-import-input" style="display:none;" onchange="importKey(event)">
+  </div>
+</div>
+
+<div id="tab-distribute" class="tab-content" style="display:none;">
+  <div class="card">
+    <h3>🌐 Distribuer sur le réseau maillé</h3>
+    <input type="text" id="distribute-id" placeholder="Backup ID" style="width:100%;padding:8px;margin:4px 0;border-radius:4px;background:#16213e;color:#e0e0e0;border:1px solid #0f3460;">
+    <button class="btn" onclick="doDistribute()">📡 Distribuer aux pairs</button>
+    <div id="distribute-result" style="margin-top:8px;"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function switchTab(btn, name) {
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  document.querySelectorAll(".tab-content").forEach(t => t.style.display = "none");
+  document.getElementById("tab-" + name).style.display = "block";
+  if (name === "list") { loadBackupList(); loadStats(); }
+  if (name === "key") loadKey();
+}
+
+// Backup
+async function doBackup() {
+  const path = document.getElementById("backup-path").value.trim();
+  const label = document.getElementById("backup-label").value.trim();
+  if (!path) return;
+  const r = await fetch("/api/backup/backup", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({path, label}),
+  });
+  const data = await r.json();
+  document.getElementById("backup-result").innerHTML = `<pre class="key-box">${JSON.stringify(data, null, 2)}</pre>`;
+}
+
+// Restore
+async function doRestore() {
+  const backup_id = document.getElementById("restore-id").value.trim();
+  const output = document.getElementById("restore-output").value.trim();
+  if (!backup_id) return;
+  const r = await fetch("/api/backup/restore", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({backup_id, output}),
+  });
+  const data = await r.json();
+  document.getElementById("restore-result").innerHTML = `<pre class="key-box">${JSON.stringify(data, null, 2)}</pre>`;
+}
+
+// List
+async function loadBackupList() {
+  const r = await fetch("/api/backup/list");
+  const list = await r.json();
+  document.getElementById("backup-list").innerHTML = list.length === 0
+    ? '<p style="color:#888;">Aucune sauvegarde.</p>'
+    : list.map(b => `
+      <div class="backup-item">
+        <div class="label">${b.label}</div>
+        <div class="meta">ID: ${b.backup_id} · ${(b.size/1024).toFixed(0)} KB · ${b.shards} fragments · ${b.erasure ? '✅ RS' : '❌ RS'}</div>
+        <div class="meta">${b.created_at} · ${b.source}</div>
+      </div>
+    `).join('');
+}
+
+async function loadStats() {
+  const r = await fetch("/api/backup/stats");
+  const s = await r.json();
+  document.getElementById("backup-stats").innerHTML = `
+    <div class="stat-card"><div class="stat-value">${s.total_backups}</div><div>Backups</div></div>
+    <div class="stat-card"><div class="stat-value">${s.total_shards}</div><div>Shards</div></div>
+    <div class="stat-card"><div class="stat-value">${s.total_size_human}</div><div>Taille</div></div>
+    <div class="stat-card"><div class="stat-value">${s.has_cryptography ? '✅' : '❌'}</div><div>Cryptographie</div></div>
+    <div class="stat-card"><div class="stat-value">${s.has_reedsolo ? '✅' : '❌'}</div><div>Reed-Solomon</div></div>
+    <div class="stat-card"><div class="stat-value">${s.key_protected ? '✅' : '❌'}</div><div>Clé présente</div></div>
+  `;
+}
+
+// Key
+async function loadKey() {
+  const r = await fetch("/api/backup/key");
+  const data = await r.json();
+  document.getElementById("key-display").textContent = JSON.stringify(data, null, 2);
+}
+
+async function exportKey() {
+  const r = await fetch("/api/backup/key/export", {method:"POST"});
+  const data = await r.json();
+  alert("Clé exportée: " + data.path);
+}
+
+async function importKey(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append("file", file);
+  // Write file then import path
+  const reader = new FileReader();
+  reader.onload = async e => {
+    const r = await fetch("/api/backup/key/import", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({path: "/tmp/imported_key.json"}),
+    });
+    const data = await r.json();
+    alert("Import: " + data.status);
+    loadKey();
+  };
+  reader.readAsText(file);
+}
+
+// Distribute
+async function doDistribute() {
+  const bid = document.getElementById("distribute-id").value.trim();
+  if (!bid) return;
+  // Get connected peers from PixNet mesh
+  const peers = await fetch("/api/pixnet/mesh/peers/connected").then(r => r.json());
+  const r = await fetch("/api/backup/distribute", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({backup_id: bid, peers}),
+  });
+  const data = await r.json();
+  document.getElementById("distribute-result").innerHTML = `<pre class="key-box">${JSON.stringify(data, null, 2)}</pre>`;
+}
+
+document.addEventListener("DOMContentLoaded", () => loadBackupList());
+</script>
+{% endblock %}

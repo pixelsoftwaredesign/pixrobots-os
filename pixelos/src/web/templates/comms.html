@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block title %}Pixel Comms{% endblock %}
+{% block content %}
+<style>
+.comms-layout { display: flex; gap: 16px; height: calc(100vh - 100px); }
+.comms-sidebar {
+  width: 260px; min-width: 260px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.comms-sidebar h3 {
+  font-size: 13px; color: var(--text-dim); text-transform: uppercase;
+  letter-spacing: 0.5px; padding: 16px 16px 8px;
+}
+.comms-sidebar .room-list { flex: 1; overflow-y: auto; }
+.comms-sidebar .room-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; cursor: pointer; font-size: 13px;
+  color: var(--text-dim); transition: 0.15s;
+  border-left: 3px solid transparent;
+}
+.comms-sidebar .room-item:hover { background: rgba(255,255,255,0.03); color: var(--text); }
+.comms-sidebar .room-item.active {
+  background: rgba(63,185,80,0.08);
+  color: var(--text); border-left-color: var(--green);
+}
+.comms-sidebar .room-item .icon { font-size: 16px; }
+.comms-sidebar .room-item .badge-iot {
+  font-size: 9px; padding: 1px 5px; border-radius: 6px;
+  background: rgba(88,166,255,0.15); color: var(--blue);
+  margin-left: auto;
+}
+.comms-main {
+  flex: 1; display: flex; flex-direction: column;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden;
+}
+.comms-main iframe { flex: 1; border: none; width: 100%; }
+.comms-main .comms-placeholder {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  color: var(--text-dim); gap: 16px;
+}
+.comms-main .comms-placeholder .big-icon { font-size: 48px; }
+.comms-toolbar {
+  display: flex; gap: 8px; padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  align-items: center;
+}
+.comms-toolbar .room-name { font-weight: 600; font-size: 14px; flex: 1; }
+.comms-toolbar .room-topic { font-size: 12px; color: var(--text-dim); }
+.modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; max-width: 480px; width: 90%; }
+.modal h2 { margin-bottom: 16px; font-size: 18px; }
+input, select, textarea { width: 100%; padding: 10px 12px; margin-bottom: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 14px; }
+label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.row { display: flex; gap: 12px; }
+.row > * { flex: 1; }
+.empty { color: var(--text-dim); text-align: center; padding: 20px 0; font-size: 13px; }
+.notif-toast { position: fixed; bottom: 24px; right: 24px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 20px; font-size: 13px; z-index: 200; animation: fadeIn 0.3s; max-width: 360px; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+
+<div class="comms-layout">
+  <div class="comms-sidebar">
+    <div class="toolbar" style="padding:12px 16px;margin:0;border-bottom:1px solid var(--border);">
+      <strong style="font-size:15px;">&#x1F4AC; Pixel Comms</strong>
+      <button class="btn-green btn-sm" style="margin-left:auto;" onclick="showModal('createRoomModal')">+</button>
+    </div>
+    <div class="room-list" id="roomList"></div>
+  </div>
+  <div class="comms-main">
+    <div class="comms-toolbar" id="commsToolbar" style="display:none;">
+      <span class="room-name" id="currentRoomName"></span>
+      <span class="room-topic" id="currentRoomTopic"></span>
+      <button class="btn-blue btn-sm" onclick="setActiveRoom(null)">&#x2716;</button>
+    </div>
+    <div id="commsContent">
+      <div class="comms-placeholder">
+        <div class="big-icon">&#x1F4AC;</div>
+        <div>Sélectionnez un salon pour discuter</div>
+        <div style="font-size:12px;">Messagerie décentralisée · Chiffrée de bout en bout</div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button class="btn-green btn-sm" onclick="showModal('createRoomModal')">Créer un salon</button>
+          <button class="btn-blue btn-sm" onclick="openElement()">Ouvrir Element</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="createRoomModal" class="modal-bg" style="display:none;" onclick="if(event.target===this)hideModal('createRoomModal')">
+  <div class="modal">
+    <h2>Nouveau salon</h2>
+    <label>Nom</label><input id="roomName" placeholder="ex: Aide Maraîchage">
+    <label>Sujet</label><input id="roomTopic" placeholder="Discussion autour du maraîchage bio">
+    <label>Description</label><textarea id="roomPurpose" rows="2"></textarea>
+    <div class="row">
+      <div><label>Type</label><select id="roomPublic"><option value="true">Public</option><option value="false">Privé</option></select></div>
+      <div><label>Chiffrement</label><select id="roomEncrypt"><option value="true">Activé</option><option value="false">Désactivé</option></select></div>
+    </div>
+    <label><input id="roomIot" type="checkbox"> Pont IoT (alertes capteurs)</label>
+    <div class="row"><button class="btn-green" onclick="createRoom()">Créer</button><button class="btn-red" onclick="hideModal('createRoomModal')">Annuler</button></div>
+  </div>
+</div>
+
+<div id="notifToast" class="notif-toast" style="display:none;"></div>
+
+<script>
+let rooms = [];
+let activeRoom = null;
+
+async function api(url, opts={}) {
+  const r = await fetch(url, { headers:{'Content-Type':'application/json'}, ...opts });
+  return r.json();
+}
+function showModal(id) { document.getElementById(id).style.display = 'flex'; }
+function hideModal(id) { document.getElementById(id).style.display = 'none'; }
+function toast(msg) {
+  const t = document.getElementById('notifToast');
+  t.textContent = msg; t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3000);
+}
+
+async function loadRooms() {
+  const data = await api('/api/comms/rooms');
+  rooms = data.rooms || [];
+  renderRooms();
+}
+
+function renderRooms() {
+  const icons = {
+    'general': '&#x1F30D;', 'aide-technique': '&#x1F527;', 'ventes': '&#x1F4B0;',
+    'biodiversite': '&#x1F33F;', 'urgences': '&#x1F6A8;', 'gouvernance': '&#x1F5B3;',
+    'annonces': '&#x1F4E2;',
+  };
+  const container = document.getElementById('roomList');
+  if (!rooms.length) {
+    container.innerHTML = '<div class="empty">Aucun salon</div>';
+    return;
+  }
+  container.innerHTML = rooms.map(r => `
+    <div class="room-item ${activeRoom === r.id ? 'active' : ''}"
+         onclick="setActiveRoom('${r.id}')">
+      <span class="icon">${icons[r.id] || '&#x1F4AC;'}</span>
+      <span>${r.name}</span>
+      ${r.auto_iot ? '<span class="badge-iot">IoT</span>' : ''}
+    </div>
+  `).join('');
+}
+
+function setActiveRoom(roomId) {
+  activeRoom = roomId;
+  renderRooms();
+  const r = rooms.find(x => x.id === roomId);
+  if (!r) {
+    document.getElementById('commsToolbar').style.display = 'none';
+    document.getElementById('commsContent').innerHTML = `
+      <div class="comms-placeholder">
+        <div class="big-icon">&#x1F4AC;</div>
+        <div>Sélectionnez un salon pour discuter</div>
+        <div style="font-size:12px;">Messagerie décentralisée · Chiffrée E2E</div>
+      </div>`;
+    return;
+  }
+  document.getElementById('commsToolbar').style.display = 'flex';
+  document.getElementById('currentRoomName').textContent = r.name;
+  document.getElementById('currentRoomTopic').textContent = r.topic || '';
+  document.getElementById('commsContent').innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:24px;text-align:center;">
+      <div style="font-size:36px;margin-bottom:12px;">${icons[r.id] || '&#x1F4AC;'}</div>
+      <h3 style="margin-bottom:4px;">${r.name}</h3>
+      <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px;">${r.topic || ''}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+        <button class="btn-green" onclick="openElement()">&#x1F517; Ouvrir Element</button>
+        <button class="btn-blue" onclick="notifyRoom('${r.id}')">&#x1F514; Tester notification</button>
+        ${r.members ? `<span style="font-size:12px;color:var(--text-dim);padding:6px 0;">${r.members.length} membres</span>` : ''}
+      </div>
+      ${r.purpose ? `<p style="color:var(--text-dim);font-size:12px;margin-top:12px;max-width:400px;">${r.purpose}</p>` : ''}
+      <div style="margin-top:20px;padding:12px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--text-dim);max-width:400px;">
+        <strong>Salon ${r.encrypted ? 'chiffré 🔒' : 'non chiffré'}</strong>
+        ${r.auto_iot ? ' · Pont IoT activé' : ''}
+        ${r.is_public ? ' · Public' : ' · Privé'}
+      </div>
+    </div>`;
+}
+
+async function createRoom() {
+  const body = {
+    name: document.getElementById('roomName').value,
+    topic: document.getElementById('roomTopic').value,
+    purpose: document.getElementById('roomPurpose').value,
+    is_public: document.getElementById('roomPublic').value === 'true',
+    encrypted: document.getElementById('roomEncrypt').value === 'true',
+    auto_iot: document.getElementById('roomIot').checked,
+  };
+  if (!body.name) { toast('Nom requis'); return; }
+  await api('/api/comms/rooms', { method:'POST', body:JSON.stringify(body) });
+  hideModal('createRoomModal');
+  toast('Salon créé !');
+  loadRooms();
+}
+
+async function notifyRoom(roomId) {
+  await api('/api/comms/notify', {
+    method:'POST',
+    body:JSON.stringify({room_id:roomId, title:'Test Pixel Comms', message:'Ceci est un message de test depuis le noyau PixelOS.', icon:'🧪'})
+  });
+  toast('Notification envoyée');
+}
+
+function openElement() {
+  window.open('/comms/', '_blank');
+}
+
+loadRooms();
+setInterval(loadRooms, 30000);
+</script>
+{% endblock %}

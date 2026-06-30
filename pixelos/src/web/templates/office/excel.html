@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixel Excel — Tableur agricole</title>
+<style>
+  :root {
+    --bg: #0a0e17; --card: #111827; --border: #1e293b;
+    --green: #22c55e; --text: #e2e8f0; --muted: #64748b;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+  }
+  .topbar {
+    display: flex; align-items: center; gap: 1rem; padding: 0.5rem 1rem;
+    background: var(--card); border-bottom: 1px solid var(--border);
+  }
+  .topbar h2 span { color: var(--green); }
+  .topbar nav { display: flex; gap: 0.5rem; margin-left: auto; }
+  .topbar nav a { color: var(--muted); text-decoration: none; padding: 0.3rem 0.75rem; border-radius: 6px; font-size: 0.85rem; }
+  .topbar nav a:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+  .toolbar {
+    display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 1rem;
+    border-bottom: 1px solid var(--border); flex-wrap: wrap;
+  }
+  .toolbar button, .toolbar select {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--text); padding: 0.3rem 0.6rem; border-radius: 4px;
+    cursor: pointer; font-size: 0.78rem;
+  }
+  .toolbar button:hover { background: rgba(255,255,255,0.05); }
+  .toolbar .spacer { flex: 1; }
+  .formula-bar {
+    display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 1rem;
+    border-bottom: 1px solid var(--border); background: var(--card);
+  }
+  .formula-bar .cell-ref {
+    font-family: monospace; font-weight: 700; font-size: 0.85rem;
+    min-width: 60px; color: var(--green);
+  }
+  .formula-bar input {
+    flex: 1; background: #000; border: 1px solid var(--border);
+    color: var(--text); padding: 0.35rem 0.5rem; border-radius: 4px;
+    font-family: monospace; font-size: 0.85rem;
+  }
+  .formula-bar input:focus { outline: none; border-color: var(--green); }
+  .grid-container { flex: 1; overflow: auto; }
+  .grid { display: grid; }
+  .grid-header {
+    background: var(--card); border-bottom: 2px solid var(--border);
+    font-weight: 600; font-size: 0.75rem; color: var(--muted);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .grid-cell {
+    border-right: 1px solid rgba(255,255,255,0.05);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    padding: 0.3rem 0.5rem; font-size: 0.82rem; cursor: text;
+    min-height: 28px; min-width: 80px;
+  }
+  .grid-cell:focus { outline: 2px solid var(--green); background: rgba(34,197,94,0.05); }
+  .grid-cell.selected { background: rgba(34,197,94,0.1); border-color: var(--green); }
+  .grid-cell .formula-indicator { color: var(--green); font-style: italic; }
+  .bottom-panel {
+    display: flex; gap: 1rem; padding: 0.5rem 1rem;
+    border-top: 1px solid var(--border);
+  }
+  .chart-container {
+    flex: 1; min-height: 200px; background: var(--card);
+    border-radius: 8px; padding: 0.5rem;
+  }
+  .status-bar { padding: 0.2rem 1rem; font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--border); }
+  .import-dialog { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; }
+  .import-dialog.active { display: flex; }
+  .import-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; max-width: 400px; width: 90%; }
+  .import-box h3 { margin-bottom: 1rem; }
+  .import-box input, .import-box select {
+    width: 100%; padding: 0.5rem; margin-bottom: 0.75rem; border-radius: 6px;
+    border: 1px solid var(--border); background: #000; color: var(--text);
+  }
+  .import-box button {
+    background: var(--green); color: #000; border: none; padding: 0.5rem 1rem;
+    border-radius: 6px; font-weight: 600; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h2>📊 <span>Pixel</span> Excel</h2>
+  <nav>
+    <a href="/office">Office</a>
+    <a href="/office/access">Access</a>
+    <a href="/office/word">Word</a>
+  </nav>
+</div>
+<div class="toolbar">
+  <button onclick="addRow()">+ Ligne</button>
+  <button onclick="addCol()">+ Colonne</button>
+  <span class="spacer"></span>
+  <button onclick="showImportSensor()">📡 Importer capteur</button>
+  <button onclick="importFromAccess()">🗄️ Importer table</button>
+  <button onclick="createChart()">📈 Graphique</button>
+  <button onclick="copySelection()">📋 Copier</button>
+</div>
+<div class="formula-bar">
+  <span class="cell-ref" id="cell-ref">A1</span>
+  <span style="color:var(--muted);font-size:0.85rem;">fx</span>
+  <input id="formula-input" placeholder="Valeur ou =SOMME(A1:A10)" onkeydown="if(event.key==='Enter')applyFormula()">
+</div>
+<div class="grid-container" id="grid-container">
+  <div id="grid" style="display:grid;grid-template-columns:40px repeat(10, 120px);">
+    <!-- Rempli par JS -->
+  </div>
+</div>
+<div class="bottom-panel" id="bottom-panel">
+  <div class="chart-container" id="chart-container">
+    <div style="text-align:center;color:var(--muted);padding-top:3rem;">📊 Sélectionnez des données et cliquez sur "Graphique"</div>
+  </div>
+</div>
+<div class="status-bar" id="status-bar">Prêt · Grille 100x26 · Cliquez sur une cellule pour éditer</div>
+
+<div class="import-dialog" id="import-dialog">
+  <div class="import-box">
+    <h3>📡 Importer données capteur</h3>
+    <input id="sensor-id" placeholder="ID du capteur">
+    <input id="sensor-metric" placeholder="Métrique (temperature, humidite...)" value="temperature">
+    <select id="sensor-days">
+      <option value="1">24h</option><option value="7" selected>7 jours</option>
+      <option value="30">30 jours</option>
+    </select>
+    <button onclick="doImportSensor()">Importer</button>
+    <button onclick="closeImport()" style="background:transparent;border:1px solid var(--border);color:var(--text);">Annuler</button>
+  </div>
+</div>
+
+<script>
+let sheet = { name: 'Sheet1', row_count: 50, col_count: 10, cells: {} };
+let selectedCell = null;
+const COL_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+function initGrid() {
+  const grid = document.getElementById('grid');
+  const cols = sheet.col_count;
+  const rows = sheet.row_count;
+  // Header row
+  let html = '<div class="grid-header" style="position:sticky;top:0;left:0;z-index:2;"></div>';
+  for (let c = 0; c < cols; c++) {
+    html += `<div class="grid-header" style="position:sticky;top:0;z-index:1;">${COL_LETTERS[c]}</div>`;
+  }
+  for (let r = 0; r < rows; r++) {
+    html += `<div class="grid-header" style="position:sticky;left:0;">${r + 1}</div>`;
+    for (let c = 0; c < cols; c++) {
+      const ref = COL_LETTERS[c] + (r + 1);
+      const cell = sheet.cells[ref];
+      const val = cell ? (cell.formatted || cell.value || '') : '';
+      const hasFormula = cell && cell.formula;
+      html += `<div class="grid-cell" data-ref="${ref}" contenteditable
+        onfocus="selectCell('${ref}')"
+        onblur="updateCell(this)"
+        onkeydown="if(event.key==='Tab'){event.preventDefault();moveNext(this);}">${val}</div>`;
+    }
+  }
+  grid.innerHTML = html;
+  const colWidth = 120;
+  const rowHeight = 28;
+  document.documentElement.style.setProperty('--cell-width', colWidth + 'px');
+  document.documentElement.style.setProperty('--cell-height', rowHeight + 'px');
+  document.getElementById('status-bar').textContent = `Grille ${rows}x${cols} · ${Object.keys(sheet.cells).length} cellules remplies`;
+}
+
+function selectCell(ref) {
+  selectedCell = ref;
+  document.getElementById('cell-ref').textContent = ref;
+  const cell = sheet.cells[ref] || {};
+  document.getElementById('formula-input').value = cell.formula || (cell.value !== undefined && cell.value !== null ? cell.value : '');
+  // Highlight
+  document.querySelectorAll('.grid-cell.selected').forEach(el => el.classList.remove('selected'));
+  document.querySelector(`[data-ref="${ref}"]`)?.classList.add('selected');
+}
+
+async function updateCell(el) {
+  const ref = el.dataset.ref;
+  const val = el.textContent.trim();
+  // Évaluer si c'est une formule
+  if (val.startsWith('=')) {
+    const r = await fetch('/api/office/excel/formula', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ sheet, formula: val }),
+    });
+    const result = await r.json();
+    if (result.status === 'ok') {
+      el.textContent = result.formatted;
+      if (!sheet.cells[ref]) sheet.cells[ref] = {};
+      sheet.cells[ref].value = result.value;
+      sheet.cells[ref].formula = val;
+      sheet.cells[ref].formatted = result.formatted;
+    } else {
+      el.textContent = '#ERR';
+    }
+  } else {
+    if (!sheet.cells[ref]) sheet.cells[ref] = {};
+    sheet.cells[ref].value = isNaN(val) || val === '' ? val : Number(val);
+    sheet.cells[ref].formula = '';
+    sheet.cells[ref].formatted = val;
+  }
+  sheet.cells[ref].error = '';
+  document.getElementById('status-bar').textContent = `Cellule ${ref}: ${val}`;
+}
+
+function moveNext(el) {
+  const ref = el.dataset.ref;
+  const col = COL_LETTERS.indexOf(ref[0]);
+  const row = parseInt(ref.slice(1));
+  const nextCol = col + 1;
+  if (nextCol < sheet.col_count) {
+    const nextRef = COL_LETTERS[nextCol] + row;
+    document.querySelector(`[data-ref="${nextRef}"]`)?.focus();
+    selectCell(nextRef);
+  } else {
+    const nextRef = COL_LETTERS[0] + (row + 1);
+    document.querySelector(`[data-ref="${nextRef}"]`)?.focus();
+    selectCell(nextRef);
+  }
+}
+
+function applyFormula() {
+  const val = document.getElementById('formula-input').value;
+  if (selectedCell) {
+    const el = document.querySelector(`[data-ref="${selectedCell}"]`);
+    if (el) {
+      el.textContent = val;
+      updateCell(el);
+    }
+  }
+}
+
+function addRow() {
+  sheet.row_count += 10;
+  initGrid();
+}
+
+function addCol() {
+  sheet.col_count = Math.min(sheet.col_count + 5, 26);
+  initGrid();
+}
+
+function showImportSensor() {
+  document.getElementById('import-dialog').classList.add('active');
+}
+function closeImport() {
+  document.getElementById('import-dialog').classList.remove('active');
+}
+
+async function doImportSensor() {
+  const sensorId = document.getElementById('sensor-id').value;
+  const metric = document.getElementById('sensor-metric').value;
+  const days = parseInt(document.getElementById('sensor-days').value);
+  if (!sensorId) return;
+  const r = await fetch('/api/office/excel/import-sensor', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ sheet, sensor_id: sensorId, metric, days }),
+  });
+  const data = await r.json();
+  if (data.sheet) sheet = data.sheet;
+  initGrid();
+  document.getElementById('status-bar').textContent = `📡 Importé: ${data.imported || 0} mesures du capteur ${sensorId}`;
+  closeImport();
+}
+
+async function importFromAccess() {
+  const table = prompt('Nom de la table Pixel Access (ex: produits, plantations):');
+  if (!table) return;
+  const r = await fetch('/api/office/excel/import-table', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ sheet, table_name: table }),
+  });
+  const data = await r.json();
+  if (data.sheet) sheet = data.sheet;
+  initGrid();
+  document.getElementById('status-bar').textContent = `🗄️ Importé: ${data.imported || 0} lignes de ${table}`;
+}
+
+async function createChart() {
+  const range = prompt('Plage de données pour le graphique (ex: A1:B10):', 'A1:B10');
+  if (!range) return;
+  const r = await fetch('/api/office/excel/chart', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ sheet, chart_type: 'line', data_range: range, title: 'Données' }),
+  });
+  const data = await r.json();
+  if (data.data) {
+    renderChart(data.data);
+    document.getElementById('status-bar').textContent = `📈 Graphique créé: ${range}`;
+  }
+}
+
+function renderChart(chartData) {
+  const container = document.getElementById('chart-container');
+  if (!chartData || !chartData.labels || !chartData.datasets) {
+    container.innerHTML = '<div style="text-align:center;color:var(--muted);padding-top:3rem;">Aucune donnée</div>';
+    return;
+  }
+  // Simple canvas-based chart using basic rendering
+  const labels = chartData.labels || [];
+  const datasets = chartData.datasets || [];
+  let html = '<div style="padding:0.5rem;"><h4 style="margin-bottom:0.5rem;">📊 Graphique</h4><table style="width:100%;font-size:0.8rem;">';
+  html += '<tr><th></th>';
+  datasets.forEach(ds => { html += `<th style="text-align:right;color:var(--green)">${ds.label}</th>`; });
+  html += '</tr>';
+  const maxVal = Math.max(...datasets.flatMap(ds => ds.data), 1);
+  labels.forEach((label, i) => {
+    html += `<tr><td style="color:var(--muted)">${label}</td>`;
+    datasets.forEach(ds => {
+      const val = ds.data[i] || 0;
+      const pct = (val / maxVal * 100).toFixed(0);
+      html += `<td style="position:relative;">
+        <div style="background:var(--green);height:16px;width:${pct}%;border-radius:3px;min-width:4px;"></div>
+        <span style="position:absolute;right:8px;top:0;font-size:0.7rem;">${val}</span>
+      </td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</table></div>';
+  container.innerHTML = html;
+}
+
+async function copySelection() {
+  if (!selectedCell) return;
+  const cell = sheet.cells[selectedCell] || {};
+  await fetch('/api/office/clipboard/copy', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      data_type: 'text', source_app: 'excel',
+      content: { text: cell.formatted || cell.value || '', format: 'plain' },
+    }),
+  });
+  document.getElementById('status-bar').textContent = `📋 Cellule ${selectedCell} copiée`;
+}
+
+initGrid();
+</script>
+</body>
+</html>

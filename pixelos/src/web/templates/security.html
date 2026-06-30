@@ -1,0 +1,517 @@
+{% extends "base.html" %}
+{% block title %}Sécurité & Défense{% endblock %}
+{% block content %}
+<style>
+.tabs { display: flex; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
+.tab { padding: 10px 20px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; color: var(--text-dim); font-size: 13px; }
+.tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.port-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+.port-card .port-num { font-size: 24px; font-weight: 700; color: var(--blue); }
+.port-card .port-status { font-size: 12px; display: inline-block; margin-top: 4px; }
+.port-card .unexpected { border-left: 3px solid var(--red); }
+.ip-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; }
+.ip-item .ip { font-family: monospace; }
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 768px) { .chart-grid { grid-template-columns: 1fr; } }
+.meter { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 8px; }
+.meter-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
+.meter-fill.green { background: var(--green); }
+.meter-fill.orange { background: var(--orange); }
+.meter-fill.red { background: var(--red); }
+</style>
+
+<h1 style="margin-bottom:20px">🛡️ Sécurité & Défense</h1>
+
+<div class="tabs" id="tabs">
+  <div class="tab active" data-tab="overview">Vue d'ensemble</div>
+  <div class="tab" data-tab="network">Réseau</div>
+  <div class="tab" data-tab="defend">PixDefend</div>
+  <div class="tab" data-tab="scudo">PixScudo</div>
+  <div class="tab" data-tab="probe">PixProbe</div>
+  <div class="tab" data-tab="profiler">Profiler</div>
+  <div class="tab" data-tab="ports">Ports</div>
+</div>
+
+<div id="tab-overview" class="tab-content active">
+  <div class="stats-grid" id="overviewGrid">
+    <div class="stat-card"><div class="label">Connexions actives</div><div class="value blue" id="ovConns">-</div></div>
+    <div class="stat-card"><div class="label">IP bloquées</div><div class="value red" id="ovBlocked">-</div></div>
+    <div class="stat-card"><div class="label">Score sécurité</div><div class="value" id="ovScore">-</div></div>
+    <div class="stat-card"><div class="label">PF State</div><div class="value" id="ovPf">-</div></div>
+  </div>
+  <div class="chart-grid">
+    <div class="stat-card">
+      <div class="label">Bande passante</div>
+      <div style="margin-top:12px">
+        <div style="display:flex;justify-content:space-between;font-size:13px">
+          <span>⬇️ RX</span><span id="bwRx">0 B/s</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:8px">
+          <span>⬆️ TX</span><span id="bwTx">0 B/s</span>
+        </div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Top talkers</div>
+      <div id="topTalkers" style="margin-top:8px;font-size:13px">Chargement...</div>
+    </div>
+  </div>
+</div>
+
+<div id="tab-network" class="tab-content">
+  <div class="toolbar">
+    <button class="btn-blue" onclick="loadInterfaces()">🔄 Interfaces</button>
+    <button class="btn-blue" onclick="loadRoutes()">🔄 Routes</button>
+    <button class="btn-blue" onclick="loadConnections()">🔄 Connexions</button>
+  </div>
+  <div id="netContent">
+    <p style="color:var(--text-dim)">Cliquez sur un bouton pour charger les données réseau.</p>
+  </div>
+</div>
+
+<div id="tab-defend" class="tab-content">
+  <div class="toolbar">
+    <button class="btn-green" onclick="defendReload()">🔄 Recharger PF</button>
+    <button class="btn-blue" onclick="loadBlocked()">📋 Liste bloquées</button>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-card"><div class="label">PF Enabled</div><div class="value blue" id="defPfEnabled">-</div></div>
+    <div class="stat-card"><div class="label">IP bloquées</div><div class="value red" id="defBlockedCount">-</div></div>
+  </div>
+  <div style="margin-bottom:16px">
+    <h3 class="section-title">Bloquer / Débloquer une IP</h3>
+    <div class="toolbar">
+      <input type="text" id="blockIpInput" placeholder="Entrez une IP..." style="width:200px">
+      <button class="btn-red" onclick="blockIp()">🚫 Bloquer</button>
+      <button class="btn-orange" onclick="unblockIp()">✅ Débloquer</button>
+    </div>
+  </div>
+  <div>
+    <h3 class="section-title">IP bloquées</h3>
+    <div id="blockedList"></div>
+  </div>
+</div>
+
+<div id="tab-scudo" class="tab-content">
+  <div class="toolbar">
+    <button class="btn-orange" onclick="runAudit()">🔍 Lancer un audit</button>
+    <button class="btn-blue" onclick="loadIntegrity()">🔐 Vérifier intégrité</button>
+    <button class="btn-blue" onclick="loadPatches()">📦 Vérifier patches</button>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-card"><div class="label">Score audit</div><div class="value" id="scScore">-</div></div>
+    <div class="stat-card"><div class="label">Patches dispo.</div><div class="value orange" id="scPatches">-</div></div>
+    <div class="stat-card"><div class="label">Problèmes paquets</div><div class="value red" id="scPkg">-</div></div>
+    <div class="stat-card"><div class="label">Ports inattendus</div><div class="value" id="scPorts">-</div></div>
+  </div>
+  <div id="auditResults"></div>
+</div>
+
+<div id="tab-probe" class="tab-content">
+  <div class="toolbar">
+    <button class="btn-blue" onclick="probeAnalyzeConns()">📊 Analyser connexions</button>
+    <button class="btn-blue" onclick="probeTcpdump()">📡 Capturer paquets</button>
+    <button class="btn-blue" onclick="probeLsof()">🔍 Processus réseau</button>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-card"><div class="label">Protocoles identifiés</div><div class="value blue" id="probeProtoCount">-</div></div>
+    <div class="stat-card"><div class="label">Connexions classifiées</div><div class="value" id="probeTotalConns">-</div></div>
+  </div>
+  <div id="probeResults">
+    <p style="color:var(--text-dim)">Cliquez sur un bouton pour analyser le trafic réseau par protocole.</p>
+  </div>
+</div>
+
+<div id="tab-profiler" class="tab-content">
+  <div class="toolbar">
+    <button class="btn-green" onclick="profilerStart()">▶️ Apprentissage 24h</button>
+    <button class="btn-red" onclick="profilerStop()">⏹️ Arrêter</button>
+    <button class="btn-orange" onclick="profilerDetect()">🔍 Détecter anomalies</button>
+    <button class="btn-blue" onclick="profilerStatus()">🔄 Statut</button>
+    <button class="btn-red" onclick="profilerReset()" style="opacity:0.7">🗑️ Reset baseline</button>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-card"><div class="label">Apprentissage</div><div class="value blue" id="profLearning">-</div></div>
+    <div class="stat-card"><div class="label">Progression</div><div class="value" id="profProgress">-</div></div>
+    <div class="stat-card"><div class="label">Échantillons</div><div class="value" id="profSamples">-</div></div>
+    <div class="stat-card"><div class="label">Anomalies</div><div class="value red" id="profAnomalies">-</div></div>
+  </div>
+  <div id="profilerResults"></div>
+</div>
+
+<div id="tab-ports" class="tab-content">
+  <div class="toolbar">
+    <button class="btn-blue" onclick="loadPorts()">🔄 Scanner les ports</button>
+  </div>
+  <div id="portsContent">Cliquez sur "Scanner les ports" pour auditer les ports ouverts.</div>
+</div>
+
+<script>
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.querySelector(`.tab[data-tab="${tab}"]`).classList.add('active');
+}
+document.getElementById('tabs').addEventListener('click', function(e) {
+  const tab = e.target.closest('.tab');
+  if (tab) switchTab(tab.dataset.tab);
+});
+
+async function api(url, opts) {
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+function fmtBytes(b) {
+  if (b >= 1e9) return (b/1e9).toFixed(1) + ' GB/s';
+  if (b >= 1e6) return (b/1e6).toFixed(1) + ' MB/s';
+  if (b >= 1e3) return (b/1e3).toFixed(1) + ' KB/s';
+  return b.toFixed(0) + ' B/s';
+}
+
+// ── Overview ──
+async function loadOverview() {
+  const s = await api('/api/security/stats');
+  document.getElementById('ovConns').textContent = s.connections || 0;
+  document.getElementById('ovBlocked').textContent = s.blocklist_size || 0;
+  document.getElementById('ovPf').textContent = 'Voir PixDefend';
+
+  const sc = await api('/api/security/scudo/summary');
+  document.getElementById('ovScore').textContent = '-';
+
+  document.getElementById('bwRx').textContent = fmtBytes(s.bandwidth?.rx_bytes_per_sec || 0);
+  document.getElementById('bwTx').textContent = fmtBytes(s.bandwidth?.tx_bytes_per_sec || 0);
+
+  const topEl = document.getElementById('topTalkers');
+  const byIp = s.by_ip || {};
+  const sorted = Object.entries(byIp).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  if (sorted.length === 0) {
+    topEl.innerHTML = '<span style="color:var(--text-dim)">Aucune connexion</span>';
+  } else {
+    topEl.innerHTML = sorted.map(([ip, c]) =>
+      `<div style="display:flex;justify-content:space-between;padding:2px 0">
+        <span style="font-family:monospace">${ip}</span><span>${c}</span>
+       </div>`
+    ).join('');
+  }
+}
+
+// ── Network ──
+async function loadInterfaces() {
+  const ifaces = await api('/api/security/interfaces');
+  document.getElementById('netContent').innerHTML =
+    '<h3 class="section-title">Interfaces</h3>' +
+    ifaces.map(iface => `
+      <div class="port-card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-family:monospace;font-weight:600">${iface.name}</span>
+          <span class="badge ${iface.status === 'up' ? 'running' : 'stopped'}">${iface.status}</span>
+        </div>
+        <div style="margin-top:8px;font-size:13px;color:var(--text-dim)">
+          ${iface.inet?.length ? iface.inet.join(', ') : 'aucune IP'}
+        </div>
+      </div>
+    `).join('');
+}
+
+async function loadRoutes() {
+  const routes = await api('/api/security/routes');
+  document.getElementById('netContent').innerHTML =
+    '<h3 class="section-title">Routes</h3>' +
+    (routes.length === 0 ? '<p style="color:var(--text-dim)">Aucune route</p>' :
+    '<table><tr><th>Destination</th><th>Gateway</th><th>Flags</th></tr>' +
+    routes.map(r => `<tr><td>${r.destination}</td><td>${r.gateway}</td><td>${r.flags}</td></tr>`).join('') +
+    '</table>');
+}
+
+async function loadConnections() {
+  const c = await api('/api/security/connections');
+  const conns = c.connections || [];
+  document.getElementById('netContent').innerHTML =
+    `<h3 class="section-title">Connexions actives (${conns.length})</h3>` +
+    (conns.length === 0 ? '<p style="color:var(--text-dim)">Aucune connexion établie</p>' :
+    '<table><tr><th>Local</th><th>Remote</th></tr>' +
+    conns.map(co => `<tr><td>${co.local}</td><td>${co.remote}</td></tr>`).join('') +
+    '</table>');
+}
+
+// ── PixDefend ──
+async function loadDefend() {
+  const d = await api('/api/security/defend/status');
+  document.getElementById('defPfEnabled').textContent = d.pf_enabled ? 'Oui' : 'Non';
+  document.getElementById('defBlockedCount').textContent = d.blocked || 0;
+}
+
+async function loadBlocked() {
+  const bl = await api('/api/security/defend/blocked');
+  const ips = bl.ips || [];
+  document.getElementById('blockedList').innerHTML =
+    ips.length === 0 ? '<p style="color:var(--text-dim)">Aucune IP bloquée</p>' :
+    ips.map(ip => `
+      <div class="ip-item">
+        <span class="ip">${ip}</span>
+        <button class="btn-orange" onclick="doUnblock('${ip}')">Débloquer</button>
+      </div>
+    `).join('');
+}
+
+async function blockIp() {
+  const ip = document.getElementById('blockIpInput').value.trim();
+  if (!ip) return alert('Entrez une IP');
+  const r = await api('/api/security/defend/block', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ip})
+  });
+  alert(r.status === 'blocked' ? `✅ ${ip} bloquée` : `❌ ${r.error}`);
+  loadBlocked(); loadDefend(); loadOverview();
+}
+
+async function unblockIp() {
+  const ip = document.getElementById('blockIpInput').value.trim();
+  if (!ip) return alert('Entrez une IP');
+  await doUnblock(ip);
+}
+
+async function doUnblock(ip) {
+  const r = await api('/api/security/defend/unblock', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ip})
+  });
+  alert(r.status === 'unblocked' ? `✅ ${ip} débloquée` : `❌ ${r.error}`);
+  loadBlocked(); loadDefend(); loadOverview();
+}
+
+async function defendReload() {
+  const r = await api('/api/security/defend/reload', {method:'POST'});
+  alert(`PF reload: ${r.status}`);
+  loadDefend();
+}
+
+// ── PixScudo ──
+async function runAudit() {
+  document.getElementById('auditResults').innerHTML = '<p style="color:var(--text-dim)">Audit en cours...</p>';
+  const a = await api('/api/security/scudo/audit', {method:'POST'});
+  document.getElementById('scScore').textContent = a.score + '/100';
+  document.getElementById('scScore').style.color = a.score >= 80 ? 'var(--green)' : a.score >= 50 ? 'var(--orange)' : 'var(--red)';
+
+  const checks = a.checks || [];
+  let html = '<h3 class="section-title">Résultats détaillés</h3>';
+  for (const [name, data] of checks) {
+    if (typeof data === 'object' && data !== null) {
+      if (data.available !== undefined && data.available > 0) {
+        html += `<div class="port-card" style="border-left:3px solid var(--red)">
+          <strong>${name}</strong>: ⚠️ ${data.available} patch(es) disponible(s)</div>`;
+      } else if (data.count !== undefined && data.count > 0) {
+        html += `<div class="port-card" style="border-left:3px solid var(--orange)">
+          <strong>${name}</strong>: ⚠️ ${data.count} problème(s)</div>`;
+      } else if (Array.isArray(data)) {
+        const warns = data.filter(d => d.warnings?.length);
+        if (warns.length) {
+          html += `<div class="port-card" style="border-left:3px solid var(--orange)">
+            <strong>${name}</strong>: ⚠️ ${warns.length} avertissement(s)</div>`;
+        } else {
+          html += `<div class="port-card" style="border-left:3px solid var(--green)">
+            <strong>${name}</strong>: ✅ OK</div>`;
+        }
+      } else {
+        html += `<div class="port-card"><strong>${name}</strong>: ${JSON.stringify(data)}</div>`;
+      }
+    }
+  }
+  document.getElementById('auditResults').innerHTML = html;
+
+  document.getElementById('scPatches').textContent = a.checks?.find(c => c[0]==='syspatch')?.[1]?.available || 0;
+  document.getElementById('scPkg').textContent = a.checks?.find(c => c[0]==='packages')?.[1]?.count || 0;
+  const portsCheck = a.checks?.find(c => c[0]==='open_ports');
+  const unexpected = portsCheck?.[1]?.unexpected || [];
+  document.getElementById('scPorts').textContent = unexpected.length ? unexpected.join(', ') : '0';
+}
+
+async function loadIntegrity() {
+  const items = await api('/api/security/scudo/integrity');
+  document.getElementById('auditResults').innerHTML =
+    '<h3 class="section-title">Intégrité des binaires critiques</h3>' +
+    (items.length === 0 ? '<p style="color:var(--text-dim)">Aucun résultat</p>' :
+    '<table><tr><th>Fichier</th><th>SHA256</th><th>Taille</th></tr>' +
+    items.map(i => `<tr>
+      <td style="font-family:monospace">${i.path}</td>
+      <td style="font-family:monospace;font-size:11px">${i.sha256 ? i.sha256.slice(0,16)+'...' : '❌'}</td>
+      <td>${i.size ? (i.size/1024).toFixed(1)+' KB' : 'N/A'}</td>
+    </tr>`).join('') +
+    '</table>');
+}
+
+async function loadPatches() {
+  const p = await api('/api/security/scudo/patches');
+  document.getElementById('auditResults').innerHTML =
+    '<h3 class="section-title">Patches disponibles</h3>' +
+    (p.patches?.length ?
+      p.patches.map(pa => `<div class="port-card">${pa}</div>`).join('') :
+      '<p style="color:var(--text-dim)">Aucun patch disponible. Système à jour.</p>');
+}
+
+// ── Ports ──
+async function loadPorts() {
+  const p = await api('/api/security/scudo/ports');
+  const allPorts = p.ports || [];
+  const unexpected = p.unexpected || [];
+  document.getElementById('portsContent') =
+    '<h3 class="section-title">Ports ouverts</h3>' +
+    (allPorts.length === 0 ? '<p style="color:var(--text-dim)">Aucun port ouvert</p>' :
+    allPorts.map(port => {
+      const isUnexpected = unexpected.includes(port);
+      return `<div class="port-card ${isUnexpected ? 'unexpected' : ''}">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="port-num">${port}</span>
+          <span class="badge ${isUnexpected ? 'offline' : 'running'}">
+            ${isUnexpected ? '⚠️ Inattendu' : '✅ Attendu'}
+          </span>
+        </div>
+      </div>`;
+    }).join(''));
+}
+
+// ── PixProbe ──
+async function probeAnalyzeConns() {
+  const s = await api('/api/security/stats');
+  const r = await api('/api/security/probe/connections', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({connections: s.by_ip ? Object.entries(s.by_ip).map(([ip,count]) => ({ip,port:0})) : []})
+  });
+  document.getElementById('probeProtoCount').textContent = r.by_protocol?.length || 0;
+  document.getElementById('probeTotalConns').textContent = r.total_connections || 0;
+  const protos = r.by_protocol || [];
+  document.getElementById('probeResults').innerHTML =
+    protos.length === 0 ? '<p style="color:var(--text-dim)">Aucune donnée</p>' :
+    protos.map(p => `
+      <div class="port-card" style="border-left:3px solid ${p.color}">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <strong>${p.name}</strong>
+            <span style="font-size:11px;color:var(--text-dim);margin-left:8px">${p.protocol}</span>
+          </div>
+          <span class="badge running">${p.count} connexions</span>
+        </div>
+      </div>
+    `).join('');
+}
+
+async function probeTcpdump() {
+  document.getElementById('probeResults').innerHTML = '<p style="color:var(--text-dim)">Capture en cours...</p>';
+  const r = await api('/api/security/probe/tcpdump?count=30');
+  const packets = r.packets || [];
+  document.getElementById('probeProtoCount').textContent = new Set(packets.map(p => p.protocol_class)).size;
+  document.getElementById('probeTotalConns').textContent = packets.length;
+  document.getElementById('probeResults').innerHTML =
+    packets.length === 0 ? '<p style="color:var(--text-dim)">Aucun paquet capturé</p>' :
+    '<table><tr><th>Protocole</th><th>Source</th><th>Destination</th></tr>' +
+    packets.map(p => `<tr>
+      <td><span style="color:${p.color};font-weight:600">${p.protocol_name}</span></td>
+      <td style="font-family:monospace;font-size:12px">${p.src}</td>
+      <td style="font-family:monospace;font-size:12px">${p.dst}</td>
+    </tr>`).join('') + '</table>';
+}
+
+async function probeLsof() {
+  const r = await api('/api/security/probe/lsof');
+  const protos = r.by_protocol || [];
+  document.getElementById('probeProtoCount').textContent = protos.length;
+  document.getElementById('probeTotalConns').textContent = r.total || 0;
+  document.getElementById('probeResults').innerHTML =
+    protos.length === 0 ? '<p style="color:var(--text-dim)">Aucun processus</p>' :
+    protos.map(p => `
+      <div class="port-card" style="border-left:3px solid ${p.color}">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <strong>${p.name}</strong>
+            <span style="font-size:11px;color:var(--text-dim);margin-left:8px">${p.protocol}</span>
+            <div style="margin-top:4px;font-size:12px;color:var(--text-dim)">
+              ${(p.processes||[]).join(', ')}
+            </div>
+          </div>
+          <span class="badge running">${p.connections} connexions</span>
+        </div>
+      </div>
+    `).join('');
+}
+
+// ── TrafficProfiler ──
+async function profilerStatus() {
+  const s = await api('/api/security/profiler/status');
+  document.getElementById('profLearning').textContent = s.learning ? 'En cours' : (s.baseline_exists ? 'Baseline OK' : 'Aucune');
+  document.getElementById('profLearning').style.color = s.learning ? 'var(--green)' : (s.baseline_exists ? 'var(--blue)' : 'var(--text-dim)');
+  document.getElementById('profSamples').textContent = s.profile?.sample_count || 0;
+  const p = await api('/api/security/profiler/progress');
+  document.getElementById('profProgress').textContent = p.learning ? `${p.progress_pct}% (${p.remaining_h.toFixed(1)}h restantes)` : (s.baseline_exists ? '100%' : '-');
+  document.getElementById('profProgress').style.color = p.learning ? 'var(--orange)' : 'var(--green)';
+  const prof = s.profile;
+  if (prof) {
+    const ips = Object.keys(prof.known_ips || {});
+    const protos = Object.keys(prof.known_protocols || {});
+    document.getElementById('profilerResults').innerHTML =
+      `<h3 class="section-title">Baseline actuelle</h3>
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+        <div class="stat-card"><div class="label">IP connues</div><div class="value blue">${ips.length}</div></div>
+        <div class="stat-card"><div class="label">Protocoles</div><div class="value">${protos.length}</div></div>
+        <div class="stat-card"><div class="label">RX avg</div><div class="value">${fmtBytes(prof.bandwidth_avg_rx)}</div></div>
+        <div class="stat-card"><div class="label">TX avg</div><div class="value">${fmtBytes(prof.bandwidth_avg_tx)}</div></div>
+      </div>`;
+  }
+}
+
+async function profilerStart() {
+  if (!confirm('Lancer l\'apprentissage automatique sur 24h ?')) return;
+  const r = await api('/api/security/profiler/start', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{"hours":24}'});
+  alert(`Apprentissage démarré pour ${r.hours}h`);
+  profilerStatus();
+}
+
+async function profilerStop() {
+  const r = await api('/api/security/profiler/stop', {method:'POST'});
+  alert(r.status === 'stopped' ? `Apprentissage arrêté (${r.samples} échantillons)` : 'Pas d\'apprentissage en cours');
+  profilerStatus();
+}
+
+async function profilerDetect() {
+  const r = await api('/api/security/profiler/anomalies');
+  const anomalies = r.anomalies || [];
+  const blocked = r.blocked || [];
+  document.getElementById('profAnomalies').textContent = anomalies.length;
+  document.getElementById('profAnomalies').style.color = anomalies.length ? 'var(--red)' : 'var(--green)';
+  let html = `<h3 class="section-title">Anomalies détectées (${anomalies.length})</h3>`;
+  if (anomalies.length === 0) {
+    html += '<p style="color:var(--text-dim)">Aucune anomalie. Trafic normal.</p>';
+  } else {
+    html += anomalies.map(a => `
+      <div class="port-card" style="border-left:3px solid ${a.severity === 'high' ? 'var(--red)' : a.severity === 'medium' ? 'var(--orange)' : 'var(--blue)'}">
+        <div style="display:flex;justify-content:space-between">
+          <div>
+            <strong>${a.type}</strong> <span class="badge ${a.severity === 'high' ? 'offline' : a.severity === 'medium' ? 'valve' : 'sensor'}">${a.severity}</span>
+            <div style="margin-top:4px;font-size:13px;color:var(--text-dim)">${a.message}</div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+  if (blocked.length) {
+    html += `<h3 class="section-title">IP automatiquement bloquées (${blocked.length})</h3>`;
+    html += blocked.map(b => `<div class="port-card">🚫 ${b.ip} — raison: ${b.reason}</div>`).join('');
+  }
+  document.getElementById('profilerResults').innerHTML = html;
+}
+
+async function profilerReset() {
+  if (!confirm('Réinitialiser complètement la baseline ?')) return;
+  const r = await api('/api/security/profiler/reset', {method:'POST'});
+  alert('Baseline réinitialisée');
+  profilerStatus();
+}
+
+// ── Init ──
+loadOverview();
+loadDefend();
+</script>
+{% endblock %}

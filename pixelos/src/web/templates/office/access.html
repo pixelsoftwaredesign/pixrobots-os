@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixel Access — Base de données agricole</title>
+<style>
+  :root {
+    --bg: #0a0e17; --card: #111827; --border: #1e293b;
+    --green: #22c55e; --orange: #f59e0b; --red: #ef4444;
+    --text: #e2e8f0; --muted: #64748b;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'Segoe UI', system-ui, monospace;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+  }
+  .topbar {
+    display: flex; align-items: center; gap: 1rem;
+    padding: 0.75rem 1.5rem; background: var(--card);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar h2 { font-size: 1.1rem; }
+  .topbar h2 span { color: var(--green); }
+  .topbar nav { display: flex; gap: 0.5rem; margin-left: auto; }
+  .topbar nav a {
+    color: var(--muted); text-decoration: none; padding: 0.3rem 0.75rem;
+    border-radius: 6px; font-size: 0.85rem;
+  }
+  .topbar nav a:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+  .container { display: flex; height: calc(100vh - 48px); }
+  .sidebar {
+    width: 220px; background: var(--card); padding: 1rem;
+    border-right: 1px solid var(--border); overflow-y: auto;
+  }
+  .sidebar h3 { font-size: 0.7rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.05em; margin: 1rem 0 0.5rem; }
+  .table-item {
+    padding: 0.5rem 0.75rem; border-radius: 6px; cursor: pointer;
+    display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+  .table-item:hover { background: rgba(255,255,255,0.05); }
+  .table-item.active { background: rgba(34,197,94,0.1); color: var(--green); }
+  .table-item .count {
+    margin-left: auto; font-size: 0.7rem; color: var(--muted);
+    background: rgba(255,255,255,0.05); padding: 0.1rem 0.4rem; border-radius: 4px;
+  }
+  .main { flex: 1; display: flex; flex-direction: column; }
+  .toolbar {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.5rem 1rem; border-bottom: 1px solid var(--border);
+  }
+  .toolbar button {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--text); padding: 0.35rem 0.75rem; border-radius: 6px;
+    cursor: pointer; font-size: 0.8rem;
+  }
+  .toolbar button:hover { background: rgba(255,255,255,0.05); }
+  .toolbar .spacer { flex: 1; }
+  .table-container { flex: 1; overflow: auto; padding: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th {
+    position: sticky; top: 0; background: var(--card);
+    padding: 0.6rem 0.75rem; text-align: left; font-weight: 600;
+    border-bottom: 2px solid var(--border); color: var(--muted); font-size: 0.8rem;
+  }
+  td { padding: 0.5rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .query-bar {
+    display: flex; gap: 0.5rem; padding: 0.5rem 1rem;
+    border-top: 1px solid var(--border); background: var(--card);
+  }
+  .query-bar input {
+    flex: 1; background: #000; border: 1px solid var(--border);
+    color: var(--text); padding: 0.5rem 0.75rem; border-radius: 6px;
+    font-family: monospace; font-size: 0.85rem;
+  }
+  .query-bar input:focus { outline: none; border-color: var(--green); }
+  .status-bar {
+    padding: 0.25rem 1rem; font-size: 0.75rem; color: var(--muted);
+    border-top: 1px solid var(--border);
+  }
+  .category-label { font-size: 0.65rem; color: var(--muted); padding: 0 0.75rem; margin-top: 0.75rem; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h2>🗄️ <span>Pixel</span> Access</h2>
+  <nav>
+    <a href="/office">Office</a>
+    <a href="/office/word">Word</a>
+    <a href="/office/excel">Excel</a>
+  </nav>
+</div>
+<div class="container">
+  <div class="sidebar" id="sidebar">
+    <h3>📂 Tables</h3>
+    <div id="table-list">Chargement...</div>
+    <h3>📋 Requêtes</h3>
+    <div id="query-list" style="font-size:0.8rem;color:var(--muted)"></div>
+  </div>
+  <div class="main">
+    <div class="toolbar">
+      <button onclick="refreshTable()">🔄 Actualiser</button>
+      <button onclick="exportCSV()">📥 CSV</button>
+      <button onclick="exportJSON()">📥 JSON</button>
+      <button onclick="copyToClipboard()">📋 Copier</button>
+      <span class="spacer"></span>
+      <span id="row-count" style="font-size:0.8rem;color:var(--muted)">0 lignes</span>
+    </div>
+    <div class="table-container" id="table-container">
+      <div style="text-align:center;padding:4rem;color:var(--muted)">Sélectionnez une table dans la colonne de gauche</div>
+    </div>
+    <div class="query-bar">
+      <input id="sql-input" placeholder="Ex: SELECT * FROM produits WHERE categorie = 'legume'" spellcheck="false"
+             onkeydown="if(event.key==='Enter')executeQuery(this.value)">
+      <button onclick="executeQuery(document.getElementById('sql-input').value)">▶ Exécuter</button>
+    </div>
+    <div class="status-bar" id="status-bar">Prêt</div>
+  </div>
+</div>
+<script>
+let currentTable = '';
+let currentData = null;
+const categories = { production: '🌱', sensors: '📡', inventory: '🏗️', federation: '🌐', general: '📦' };
+
+async function loadTables() {
+  const r = await fetch('/api/office/access/tables');
+  const data = await r.json();
+  const list = document.getElementById('table-list');
+  let lastCat = '';
+  list.innerHTML = data.tables.map(t => {
+    let header = '';
+    if (t.category !== lastCat) {
+      lastCat = t.category;
+      header = `<div class="category-label">${categories[t.category]||'📦'} ${t.category}</div>`;
+    }
+    return header + `<div class="table-item" onclick="loadTable('${t.name}')" data-table="${t.name}">
+      ${t.name} <span class="count">${t.row_count}</span>
+    </div>`;
+  }).join('');
+}
+
+async function loadTable(name) {
+  currentTable = name;
+  document.querySelectorAll('.table-item').forEach(el => el.classList.remove('active'));
+  document.querySelector(`[data-table="${name}"]`)?.classList.add('active');
+  document.getElementById('status-bar').textContent = `Chargement ${name}...`;
+  const r = await fetch(`/api/office/access/table/${name}?limit=200`);
+  const data = await r.json();
+  currentData = data;
+  renderTable(data);
+  document.getElementById('status-bar').textContent = `Table: ${name} — ${data.total} lignes`;
+  document.getElementById('row-count').textContent = `${data.total} lignes`;
+}
+
+function renderTable(data) {
+  const container = document.getElementById('table-container');
+  if (!data || !data.columns || !data.rows) {
+    container.innerHTML = '<div style="text-align:center;padding:4rem;color:var(--muted)">Aucune donnée</div>';
+    return;
+  }
+  let html = '<table><thead><tr>';
+  html += data.columns.map(c => `<th>${c}</th>`).join('');
+  html += '</tr></thead><tbody>';
+  html += data.rows.map(row => '<tr>' + data.columns.map(c => `<td>${row[c] !== null && row[c] !== undefined ? row[c] : ''}</td>`).join('') + '</tr>').join('');
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+async function refreshTable() {
+  if (currentTable) await loadTable(currentTable);
+}
+
+async function executeQuery(sql) {
+  if (!sql.trim()) return;
+  document.getElementById('status-bar').textContent = 'Exécution...';
+  const r = await fetch('/api/office/access/query', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({sql}),
+  });
+  const data = await r.json();
+  if (data.columns) {
+    currentData = data;
+    renderTable(data);
+    document.getElementById('status-bar').textContent = `Requête: ${data.total} résultats`;
+  } else {
+    document.getElementById('status-bar').textContent = `Résultat: ${data.status || data.message}`;
+  }
+}
+
+function exportCSV() {
+  if (!currentData) return;
+  let csv = currentData.columns.join(',') + '\n';
+  csv += currentData.rows.map(r => currentData.columns.map(c => `"${r[c]||''}"`).join(',')).join('\n');
+  downloadFile(csv, `${currentTable}.csv`, 'text/csv');
+}
+
+function exportJSON() {
+  if (!currentData) return;
+  downloadFile(JSON.stringify(currentData.rows, null, 2), `${currentTable}.json`, 'application/json');
+}
+
+function copyToClipboard() {
+  if (!currentData) return;
+  fetch('/api/office/clipboard/copy', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      data_type: 'table',
+      source_app: 'access',
+      content: { headers: currentData.columns, rows: currentData.rows.map(r => currentData.columns.map(c => r[c])) },
+    }),
+  }).then(() => { document.getElementById('status-bar').textContent = '✅ Copié dans le presse-papier Pixel'; });
+}
+
+function downloadFile(content, filename, mime) {
+  const blob = new Blob([content], {type: mime});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+loadTables();
+</script>
+</body>
+</html>

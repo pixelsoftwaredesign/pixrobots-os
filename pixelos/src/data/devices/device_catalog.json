@@ -1,0 +1,28 @@
+{
+  "test-sensor-01": {
+    "device_id": "test-sensor-01",
+    "protocol": "wifi",
+    "fingerprint": "soil-moisture-kitchen",
+    "manufacturer": "Generic",
+    "model": "",
+    "device_type": "capteur_sol",
+    "sensor_type": "humidite_sol",
+    "space_id": "serre_a",
+    "space_label": "",
+    "parent_device_id": "",
+    "status": "active",
+    "provision_step": 3,
+    "ip_address": "",
+    "mac_address": "",
+    "mqtt_topic": "pixelos/test-sensor-01",
+    "last_seen": "2026-06-29 11:31:15.017656+00:00",
+    "firmware_version": "",
+    "signal_strength": 0,
+    "battery_level": 100.0,
+    "meta": "{\"fingerprint_matched\": \"soil-moisture-*\"}",
+    "discovered_at": "2026-06-29 11:31:14.779420+00:00",
+    "provisioned_at": "2026-06-29 11:31:15.016660+00:00",
+    "active_at": "2026-06-29 11:31:15.017656+00:00",
+    "retired_at": null
+  }
+}

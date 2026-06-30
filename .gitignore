@@ -61,3 +61,6 @@ pixelos/models/
 pixelos/logs/
 pixelos/pixelos-agent.bat
 pixelos/data/
+
+# Backup directories with long paths
+pixelos/src/.backups/

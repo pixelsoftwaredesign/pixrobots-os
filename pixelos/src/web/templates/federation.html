@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Réseau Fédéré PixelOS</title>
+<style>
+  :root {
+    --bg: #0a0e17;
+    --card: #111827;
+    --border: #1e293b;
+    --green: #22c55e;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'Segoe UI', system-ui, monospace;
+    background: var(--bg);
+    color: var(--text);
+    padding: 2rem;
+  }
+  .container { max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
+  h1 span { color: var(--green); }
+  .subtitle { color: var(--muted); margin-bottom: 2rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+  }
+  .card h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.5rem; }
+  .card .value { font-size: 2rem; font-weight: 700; }
+  .card .value.green { color: var(--green); }
+  .card .value.orange { color: var(--orange); }
+  .card .value.red { color: var(--red); }
+  .world-map {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 2rem;
+    position: relative;
+    min-height: 300px;
+    overflow: hidden;
+  }
+  .map-grid {
+    display: grid;
+    grid-template-columns: repeat(24, 1fr);
+    grid-template-rows: repeat(12, 1fr);
+    gap: 2px;
+    opacity: 0.3;
+    position: absolute;
+    inset: 1.25rem;
+  }
+  .map-cell { background: var(--border); border-radius: 2px; }
+  .map-cell.land { background: #1e3a5f; }
+  .map-cell.active { background: var(--green); opacity: 1; box-shadow: 0 0 8px var(--green); }
+  .map-cell.active.offline { background: var(--muted); opacity: 0.5; }
+  .map-overlay {
+    position: relative;
+    z-index: 1;
+    padding: 1rem;
+  }
+  .node-list { display: flex; flex-direction: column; gap: 0.75rem; }
+  .node-item {
+    display: flex; align-items: center; gap: 1rem;
+    background: rgba(255,255,255,0.03);
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+  }
+  .node-item:hover { border-color: var(--border); }
+  .node-status { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .node-status.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .node-status.offline { background: var(--muted); }
+  .node-info { flex: 1; }
+  .node-info .id { font-size: 0.8rem; font-family: monospace; opacity: 0.7; }
+  .node-info .name { font-weight: 600; }
+  .node-meta { font-size: 0.75rem; color: var(--muted); }
+  .species-badge {
+    display: inline-block;
+    background: rgba(34,197,94,0.15);
+    color: var(--green);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  .tab-bar { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+  .tab {
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+  .tab.active { background: rgba(34,197,94,0.1); border-color: var(--green); color: var(--green); }
+  .tab:hover { background: rgba(255,255,255,0.05); }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🌍 <span>PixelOS</span> Federation</h1>
+  <p class="subtitle">Réseau mondial décentralisé de souveraineté agricole</p>
+
+  <div class="tab-bar" id="tabs">
+    <button class="tab active" data-tab="nodes">Nœuds</button>
+    <button class="tab" data-tab="species">Biodiversité</button>
+    <button class="tab" data-tab="gov">Gouvernance</button>
+    <button class="tab" data-tab="mesh">Mesh</button>
+  </div>
+
+  <div class="grid" id="stats-grid">
+    <div class="card"><h3>Nœuds connectés</h3><div class="value green" id="total-nodes">-</div></div>
+    <div class="card"><h3>Espèces enregistrées</h3><div class="value green" id="total-species">-</div></div>
+    <div class="card"><h3>Membres association</h3><div class="value orange" id="total-members">-</div></div>
+    <div class="card"><h3>Propositions ouvertes</h3><div class="value" id="total-proposals">-</div></div>
+  </div>
+
+  <div class="world-map" id="map-container">
+    <div class="map-grid" id="map-grid"></div>
+    <div class="map-overlay" id="map-nodes"></div>
+  </div>
+
+  <div id="panel-nodes" class="tab-content">
+    <div class="node-list" id="node-list"><p style="color:var(--muted)">Chargement...</p></div>
+  </div>
+
+  <div id="panel-species" class="tab-content" style="display:none">
+    <div class="node-list" id="species-list"><p style="color:var(--muted)">Chargement...</p></div>
+  </div>
+
+  <div id="panel-gov" class="tab-content" style="display:none">
+    <div class="node-list" id="gov-list"><p style="color:var(--muted)">Chargement...</p></div>
+  </div>
+
+  <div id="panel-mesh" class="tab-content" style="display:none">
+    <div class="node-list" id="mesh-list"><p style="color:var(--muted)">Chargement...</p></div>
+  </div>
+</div>
+
+<script>
+async function fetchJSON(url) {
+  try {
+    const r = await fetch(url);
+    return await r.json();
+  } catch { return null; }
+}
+
+function renderMap(nodes) {
+  const grid = document.getElementById('map-grid');
+  grid.innerHTML = '';
+  // Simple world map approximation (24x12 grid)
+  const land = [
+    2,3,4,5,6,7, 25,26,27,28,29,30,31,32,33,34,35,36,37,38, 49,50,51,52,53,54,55,56,57,58,59,60,61,62,
+    73,74,75,76,77,78,79,80,81,82,83,84,85,86, 97,98,99,100,101,102,103,104,105,106,107,108,109,110,
+    121,122,123,124,125,126,127,128,129,130,131,132,133,134, 145,146,147,148,149,150,151,152,153,154,155,156,157,158,
+    169,170,171,172,173,174,175,176,177,178,179,180,181,182, 193,194,195,196,197,198,199,200,201,202,203,204,205,206,
+    217,218,219,220,221,222,223,224,225,226,227,228,229,230, 241,242,243,244,245,246,247,248,249,250,251,252,253,254,
+    265,266,267,268,269,270,271,272,273,274,275,276,277,278, 289,290,291,292,293,294,295,296,297,298,299,300,301,302,
+    313,314,315,316,317,318,319,320,321,322,323, 337,338,339,340, 361,362,363,364,365,366,367,368,369,370,371, 385,386,387,388,389,390,391,392,393,394,395,
+    409,410,411,412,413,414,415,416,417,418,419, 433,434,435,436,437,438,439,440,441,442,443, 457,458,459,460,461,462,463,464,465,466,467,
+  ];
+  for (let i = 0; i < 288; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'map-cell';
+    if (land.includes(i)) cell.classList.add('land');
+    if (nodes && nodes[i]) {
+      cell.classList.add(nodes[i].online ? 'active' : 'active offline');
+      cell.title = nodes[i].name || nodes[i].node_id;
+    }
+    grid.appendChild(cell);
+  }
+}
+
+async function loadNodes() {
+  const data = await fetchJSON('/api/node/peers');
+  const list = document.getElementById('node-list');
+  const total = document.getElementById('total-nodes');
+  if (!data) { list.innerHTML = '<p style="color:var(--red)">Serveur PixelOS inaccessible</p>'; return; }
+  const peers = data.peers || [];
+  total.textContent = peers.length;
+  if (peers.length === 0) {
+    list.innerHTML = '<p style="color:var(--muted)">Aucun pair connecté. Rejoignez le réseau avec <code>pixelos federation discover</code></p>';
+    return;
+  }
+  list.innerHTML = peers.map(p => `
+    <div class="node-item">
+      <div class="node-status ${p.online ? 'online' : 'offline'}"></div>
+      <div class="node-info">
+        <div class="name">${p.nickname || p.node_id?.slice(0,12) || 'Anonyme'}</div>
+        <div class="id">${p.node_id || ''}</div>
+      </div>
+      <div class="node-meta">
+        ${p.country || ''} ${p.region ? '· '+p.region:''}
+        ${p.species_count ? '· <span class="species-badge">'+p.species_count+' esp.</span>' : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function loadSpecies() {
+  const data = await fetchJSON('/api/biodiversity/stats');
+  const list = document.getElementById('species-list');
+  const total = document.getElementById('total-species');
+  if (!data) { list.innerHTML = '<p style="color:var(--red)">Erreur chargement biodiversité</p>'; return; }
+  total.textContent = data.total || 0;
+  Object.entries(data).filter(([k]) => k !== 'total').forEach(([status, count]) => {
+    if (count > 0) {
+      list.innerHTML += `<div class="node-item"><span class="species-badge">${status}</span> ${count} espèce${count > 1 ? 's' : ''}</div>`;
+    }
+  });
+  if (!list.innerHTML) list.innerHTML = '<p style="color:var(--muted)">Aucune espèce enregistrée</p>';
+}
+
+async function loadGov() {
+  const data = await fetchJSON('/api/gov/status');
+  const list = document.getElementById('gov-list');
+  const total = document.getElementById('total-members');
+  const proposals = document.getElementById('total-proposals');
+  if (!data) { list.innerHTML = '<p style="color:var(--red)">Erreur chargement gouvernance</p>'; return; }
+  total.textContent = data.members || 0;
+  proposals.textContent = data.proposals_open || 0;
+  list.innerHTML = `
+    <div class="node-item"><span class="species-badge">👥</span> ${data.members || 0} membres · ${data.validators || 0} validateurs</div>
+    <div class="node-item"><span class="species-badge">📋</span> ${data.proposals_open || 0} propositions ouvertes · ${data.proposals_approved || 0} approuvées</div>
+    <div class="node-item"><span class="species-badge">⚖️</span> Consensus: ${data.consensus_threshold || '67%'} · Vote: ${data.voting_period_h || 72}h</div>
+  `;
+}
+
+async function loadMesh() {
+  const data = await fetchJSON('/api/mesh/status');
+  const list = document.getElementById('mesh-list');
+  if (!data) { list.innerHTML = '<p style="color:var(--red)">Erreur chargement mesh</p>'; return; }
+  list.innerHTML = `
+    <div class="node-item"><span class="species-badge">🌐</span> Interface: ${data.interface || 'N/A'} · Réseau: ${data.network || 'N/A'}</div>
+    <div class="node-item"><span class="species-badge">📡</span> ${data.peers_online || 0}/${data.peers_total || 0} pairs en ligne</div>
+    ${(data.peers || []).map(p => `
+      <div class="node-item">
+        <div class="node-status ${p.online ? 'online' : 'offline'}"></div>
+        <div class="node-info"><div class="name">${p.node_id?.slice(0,16) || 'N/A'}</div></div>
+        <div class="node-meta">${p.endpoint || ''}</div>
+      </div>
+    `).join('')}
+  `;
+}
+
+// Tab switching
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+    document.getElementById('panel-' + tab.dataset.tab).style.display = '';
+  });
+});
+
+// Init
+loadNodes(); loadSpecies(); loadGov(); loadMesh();
+</script>
+</body>
+</html>

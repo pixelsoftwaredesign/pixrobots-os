@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Espaces - PixelOS{% endblock %}
+{% block content %}
+<style>
+.sp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 16px; }
+.sp-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+.sp-card .sp-type { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); }
+.sp-card .sp-name { font-size: 18px; font-weight: 700; margin: 4px 0; }
+.sp-card .sp-location { font-size: 13px; color: var(--text-dim); margin-bottom: 4px; }
+.sp-card .sp-desc { font-size: 12px; color: var(--text-dim); margin-bottom: 12px; font-style: italic; }
+.sensor-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
+.sensor-item { background: var(--bg); padding: 5px 10px; border-radius: 6px; font-size: 11px; min-width: 90px; }
+.sensor-item .s-val { font-weight: 700; font-size: 13px; }
+.sensor-item .s-label { color: var(--text-dim); font-size: 10px; }
+.sensor-item .s-alarm { color: var(--red); }
+.sensor-item .s-ok { color: var(--green); }
+.control-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+.control-btn { padding: 4px 10px; font-size: 11px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; }
+.control-btn:hover { background: var(--card); }
+.control-btn.on { border-color: var(--green); color: var(--green); }
+.control-btn.pwm { border-color: var(--orange); color: var(--orange); }
+.control-btn.auto { border-color: var(--blue); color: var(--blue); }
+.subzone-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.subzone-row:last-child { border-bottom: none; }
+.subzone-row .sz-product { color: var(--blue); }
+.subzone-row .sz-empty { color: var(--text-dim); font-style: italic; }
+.auto-badge { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 10px; margin: 2px; cursor: pointer; }
+.auto-on { background: rgba(63,185,80,0.15); color: var(--green); border: 1px solid var(--green); }
+.auto-off { background: rgba(248,81,73,0.15); color: var(--red); border: 1px solid var(--red); }
+</style>
+
+<div class="stats-grid" id="stats"></div>
+
+<div class="toolbar">
+  <button class="btn-blue" onclick="readAllSensors()">Lire tous les capteurs</button>
+  <button class="btn-green" onclick="autoControlCycle()">Cycle auto-controle</button>
+  <button class="btn-orange" onclick="showAddEspace()">+ Ajouter espace</button>
+  <span id="statusMsg" style="font-size:13px;color:var(--text-dim)"></span>
+</div>
+
+<div id="addEspaceForm" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px">
+  <h4 style="margin-bottom:12px">Ajouter un espace (confirmation requise)</h4>
+  <form onsubmit="addEspace(event)" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;max-width:700px">
+    <input id="newEspaceId" placeholder="ID (ex: tunnel_est)" required>
+    <select id="newEspaceType"><option value="serre">Serre</option><option value="pepiniere">Pepiniere</option><option value="plein_champ">Plein Champ</option><option value="verger">Verger</option><option value="tunnel">Tunnel</option><option value="jardin">Jardin</option></select>
+    <input id="newEspaceLabel" placeholder="Label (ex: Tunnel Est)">
+    <input id="newEspaceLocation" placeholder="Localisation">
+    <input id="newEspaceDesc" placeholder="Description">
+    <button type="submit" class="btn-green">Ajouter (confirmer)</button>
+  </form>
+</div>
+
+<div class="sp-grid" id="spacesGrid"></div>
+
+<h3 style="margin-top:30px;font-size:16px">Actions rapides</h3>
+<div class="toolbar">
+  <button class="btn-green" onclick="cultivationMonitor()">Lancer surveillance intelligente</button>
+  <button class="btn-blue" onclick="loadSuggestions()">Voir suggestions</button>
+</div>
+<div id="suggestionsContainer"></div>
+
+<script>
+async function loadSpaces() {
+  const data = await (await fetch('/api/spaces/list')).json();
+  renderSpaces(data);
+  updateStats(data);
+}
+function updateStats(espaces) {
+  let sensors = 0, controls = 0, zones = 0, autoI=0, autoC=0, autoL=0;
+  espaces.forEach(e => { sensors += Object.keys(e.sensors).length; controls += Object.keys(e.controls).length; zones += Object.keys(e.sub_zones).length; if(e.auto_irrigation) autoI++; if(e.auto_climate) autoC++; if(e.auto_light) autoL++; });
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-card"><div class="label">Espaces</div><div class="value green">${espaces.length}</div></div>
+    <div class="stat-card"><div class="label">Capteurs</div><div class="value blue">${sensors}</div></div>
+    <div class="stat-card"><div class="label">Controles</div><div class="value" style="color:var(--orange)">${controls}</div></div>
+    <div class="stat-card"><div class="label">Sous-zones</div><div class="value">${zones}</div></div>
+    <div class="stat-card"><div class="label">Auto irrigation</div><div class="value ${autoI>0?'green':'red'}">${autoI}</div></div>
+    <div class="stat-card"><div class="label">Auto climat</div><div class="value ${autoC>0?'green':'red'}">${autoC}</div></div>`;
+}
+function renderSpaces(espaces) {
+  const grid = document.getElementById('spacesGrid');
+  grid.innerHTML = espaces.map(e => {
+    const sensors = Object.values(e.sensors).map(s => {
+      const alarm = s.status === 'alarm_low' || s.status === 'alarm_high';
+      return `<div class="sensor-item"><div class="s-label">${s.icon} ${escHtml(s.label)}</div><div class="s-val ${alarm?'s-alarm':'s-ok'}">${s.value}${s.unit}</div><div style="font-size:9px;color:var(--text-dim)">${s.status}</div></div>`;
+    }).join('');
+    const controls = Object.values(e.controls).map(c => {
+      const cls = c.state === 'on' ? 'on' : c.state === 'pwm' ? 'pwm' : '';
+      const autoCls = c.auto_mode ? 'auto' : '';
+      return `<button class="control-btn ${cls} ${autoCls}" onclick="toggleControl('${e.espace_id}','${c.control_id}')" title="${c.auto_mode ? 'Auto ON' : 'Auto OFF'}">${c.icon} ${escHtml(c.label)} [${c.state}${c.value>0?' '+c.value+'%':''}]</button>`;
+    }).join('');
+    const zones = Object.values(e.sub_zones).map(z =>
+      `<div class="subzone-row"><span>${escHtml(z.label)} (${z.area_m2}m2)</span><span class="${z.product_id||z.culture?'sz-product':'sz-empty'}">${z.culture||z.product_id||'Aucun'}</span></div>`
+    ).join('');
+    const autoBadges = `
+      <span class="auto-badge ${e.auto_irrigation?'auto-on':'auto-off'}" onclick="toggleAuto('${e.espace_id}','irrigation')">Irrig ${e.auto_irrigation?'ON':'OFF'}</span>
+      <span class="auto-badge ${e.auto_climate?'auto-on':'auto-off'}" onclick="toggleAuto('${e.espace_id}','climate')">Climat ${e.auto_climate?'ON':'OFF'}</span>
+      <span class="auto-badge ${e.auto_light?'auto-on':'auto-off'}" onclick="toggleAuto('${e.espace_id}','light')">Lumiere ${e.auto_light?'ON':'OFF'}</span>`;
+    return `<div class="sp-card">
+      <div class="sp-type">${e.type}</div>
+      <div class="sp-name">${escHtml(e.label)}</div>
+      <div class="sp-location">${escHtml(e.location)}</div>
+      <div class="sp-desc">${escHtml(e.description||'')}</div>
+      <div>${autoBadges}</div>
+      <div style="font-size:12px;font-weight:600;margin-top:10px">Capteurs</div>
+      <div class="sensor-row">${sensors || '<span style="color:var(--text-dim)">Aucun capteur</span>'}</div>
+      <div style="font-size:12px;font-weight:600;margin-top:6px">Controles</div>
+      <div class="control-row">${controls || '<span style="color:var(--text-dim)">Aucun controle</span>'}</div>
+      <div style="font-size:12px;font-weight:600;margin-top:6px">Sous-zones</div>
+      ${zones || '<div style="color:var(--text-dim);font-size:12px">Aucune</div>'}
+    </div>`;
+  }).join('');
+}
+async function toggleControl(espaceId, controlId) {
+  const r = await fetch(`/api/spaces/${espaceId}/controls/${controlId}`, {
+    method:'PUT', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({action:'toggle'})
+  });
+  if (r.ok) loadSpaces();
+}
+async function toggleAuto(espaceId, autoType) {
+  const e = (await (await fetch('/api/spaces/list')).json()).find(x=>x.espace_id===espaceId);
+  const current = e ? e['auto_'+autoType] : false;
+  await fetch(`/api/spaces/${espaceId}/controls/auto`, {
+    method:'PUT', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({auto_type: autoType, enabled: !current})
+  });
+  loadSpaces();
+}
+async function readAllSensors() {
+  document.getElementById('statusMsg').textContent = 'Lecture...';
+  const espaces = await (await fetch('/api/spaces/list')).json();
+  for (const e of espaces) await fetch(`/api/spaces/${e.espace_id}/sensors`, {method:'POST'});
+  document.getElementById('statusMsg').textContent = 'Capteurs actualises';
+  loadSpaces();
+}
+async function autoControlCycle() {
+  document.getElementById('statusMsg').textContent = 'Cycle auto-controle en cours...';
+  const r = await fetch('/api/cultivation/monitor', {method:'POST'});
+  const result = await r.json();
+  document.getElementById('statusMsg').textContent = result.auto_actions.length + ' actions auto effectuees, ' + result.tasks_created.length + ' taches creees';
+  loadSpaces();
+}
+function showAddEspace() {
+  const f = document.getElementById('addEspaceForm');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+async function addEspace(e) {
+  e.preventDefault();
+  const data = {
+    espace_id: document.getElementById('newEspaceId').value,
+    type: document.getElementById('newEspaceType').value,
+    label: document.getElementById('newEspaceLabel').value,
+    location: document.getElementById('newEspaceLocation').value,
+    description: document.getElementById('newEspaceDesc').value,
+    confirm: true
+  };
+  const r = await fetch('/api/spaces/add', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+  const result = await r.json();
+  document.getElementById('statusMsg').textContent = result.status === 'ok' ? 'Espace ajoute !' : (result.error || 'Erreur');
+  if (result.status === 'ok') { loadSpaces(); document.getElementById('addEspaceForm').style.display = 'none'; document.getElementById('addEspaceForm').querySelector('form').reset(); }
+}
+async function cultivationMonitor() {
+  document.getElementById('statusMsg').textContent = 'Surveillance intelligente...';
+  const r = await fetch('/api/cultivation/monitor', {method:'POST'});
+  const result = await r.json();
+  document.getElementById('statusMsg').textContent = result.counts.deviations + ' deviations, ' + result.counts.suggestions + ' suggestions, ' + result.counts.tasks_created + ' taches';
+  loadSuggestions();
+}
+async function loadSuggestions() {
+  const r = await fetch('/api/cultivation/suggestions');
+  const suggestions = await r.json();
+  const c = document.getElementById('suggestionsContainer');
+  if (!suggestions.length) { c.innerHTML = '<p style="color:var(--text-dim);margin-top:12px">Aucune suggestion</p>'; return; }
+  c.innerHTML = '<h4 style="margin:16px 0 8px">Suggestions ('+suggestions.length+')</h4>' +
+    suggestions.map(s => `<div class="alert-item ${s.priority==='urgent'?'critical':''}">
+      <div class="alert-name">[${s.priority}] ${s.type.replace(/_/g,' ')}</div>
+      <div class="alert-desc">${escHtml(s.message)}</div>
+    </div>`).join('');
+}
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
+loadSpaces();
+setInterval(loadSpaces, 15000);
+</script>
+{% endblock %}

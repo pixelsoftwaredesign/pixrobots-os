@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Recolte</h2>
+<div class="stats-grid" id="stats"></div>
+
+<h3 class="section-title">Lignes de Production</h3>
+<div class="toolbar">
+  <button class="btn-blue" onclick="estimateAll()">Estimer rendements</button>
+  <button class="btn-green" onclick="loadPredictions()">Previsions par zone</button>
+</div>
+<table id="linesTable">
+  <thead>
+    <tr><th>Ligne</th><th>Zone</th><th>Produit</th><th>Pieds</th><th>Estime kg</th><th>Valeur estimee</th><th>Recolte kg</th><th>Status</th><th>Action</th></tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<h3 class="section-title">Previsions par Zone</h3>
+<div id="predictions"></div>
+
+<h3 class="section-title">Lots Recents</h3>
+<table id="batchesTable">
+  <thead>
+    <tr><th>Lot</th><th>Produit</th><th>Zone</th><th>Date</th><th>Poids kg</th><th>Prix/kg</th><th>Total</th><th>Qualite</th><th>Status</th></tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<h3 class="section-title">Nouvelle Recolte</h3>
+<form id="harvestForm" onsubmit="createHarvest(event)" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;max-width:800px">
+  <select id="lineSelect" required><option value="">-- Ligne --</option></select>
+  <input type="number" id="weightInput" placeholder="Poids (kg)" step="0.1" required>
+  <input type="number" id="priceInput" placeholder="Prix/kg (optionnel)" step="0.01">
+  <select id="qualitySelect"><option value="A">Qualite A</option><option value="B">B</option><option value="C">C</option></select>
+  <input type="date" id="dateInput">
+  <button type="submit" class="btn-green">Enregistrer la recolte</button>
+</form>
+
+<h3 class="section-title">Suggestions de Recolte</h3>
+<div id="suggestions"></div>
+
+<script>
+async function load() {
+  const r = await fetch('/api/harvest/summary');
+  const s = await r.json();
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-card"><div class="label">Lignes actives</div><div class="value green">${s.active_lines}/${s.lines}</div></div>
+    <div class="stat-card"><div class="label">Lots</div><div class="value blue">${s.batches}</div></div>
+    <div class="stat-card"><div class="label">En culture (kg)</div><div class="value blue">${s.inventory.en_culture_kg}</div></div>
+    <div class="stat-card"><div class="label">Pret vente (kg)</div><div class="value green">${s.inventory.pret_vente_kg}</div></div>
+    <div class="stat-card"><div class="label">Distribue (kg)</div><div class="value orange">${s.inventory.distribue_kg}</div></div>
+    <div class="stat-card"><div class="label">Valeur totale</div><div class="value" style="color:var(--orange)">${s.inventory.valeur_totale.toFixed(2)}€</div></div>`;
+  loadLines(); loadBatches(); loadSuggestions(); loadLineSelect();
+}
+async function loadLines() {
+  const r = await fetch('/api/harvest/lines');
+  const lines = await r.json();
+  document.querySelector('#linesTable tbody').innerHTML = lines.map(l =>
+    `<tr>
+      <td>${l.label}</td><td>${l.zone_id}</td><td>${l.product_id}</td><td>${l.plant_count}</td>
+      <td>${l.expected_yield_kg}</td><td>${l.estimated_value.toFixed(2)}€</td>
+      <td>${l.actual_yield_kg}</td>
+      <td><span class="badge ${l.status==='active'?'online':'offline'}">${l.status}</span></td>
+      <td><button class="btn-blue" onclick="showHarvestForm('${l.line_id}')" ${l.status!=='active'?'disabled':''}>Recolter</button></td>
+    </tr>`).join('');
+}
+async function loadBatches() {
+  const r = await fetch('/api/harvest/batches');
+  const batches = await r.json();
+  document.querySelector('#batchesTable tbody').innerHTML = batches.sort((a,b)=>b.harvest_date.localeCompare(a.harvest_date)).slice(0,20).map(b =>
+    `<tr>
+      <td>${b.batch_id}</td><td>${b.product_id}</td><td>${b.zone_id}</td>
+      <td>${b.harvest_date}</td><td>${b.weight_kg}</td><td>${b.unit_price.toFixed(2)}€</td>
+      <td>${b.total_value.toFixed(2)}€</td>
+      <td><span class="badge ok">${b.quality_grade}</span></td>
+      <td><span class="badge ${b.status=='pending'?'offline':'online'}">${b.status}</span></td>
+    </tr>`).join('');
+}
+async function loadLineSelect() {
+  const r = await fetch('/api/harvest/lines');
+  const lines = await r.json();
+  document.getElementById('lineSelect').innerHTML =
+    `<option value="">-- Ligne --</option>` +
+    lines.filter(l => l.status === 'active').map(l =>
+      `<option value="${l.line_id}">${l.label} (${l.product_id})</option>`).join('');
+}
+async function estimateAll() {
+  await fetch('/api/harvest/estimate', {method:'POST'});
+  loadLines();
+}
+async function loadPredictions() {
+  const r = await fetch('/api/harvest/predict');
+  const p = await r.json();
+  document.getElementById('predictions').innerHTML = Object.values(p).map(z =>
+    `<div class="stat-card" style="display:inline-block;margin:8px;min-width:200px">
+      <div class="label">${z.zone_id}</div>
+      <div class="value blue">${z.expected_kg} kg</div>
+      <div style="font-size:14px;color:var(--text-dim)">${z.lines} lignes, ${z.plants} pieds</div>
+      <div style="font-size:16px;color:var(--orange)">${z.estimated_value.toFixed(2)}€</div>
+    </div>`).join('');
+}
+async function loadSuggestions() {
+  const r = await fetch('/api/harvest/suggestions');
+  const s = await r.json();
+  document.getElementById('suggestions').innerHTML = s.length ? s.map(sg =>
+    `<div class="alert-item"><div class="alert-name">${sg.message}</div><div class="alert-desc">Estime: ${sg.estimated_kg}kg, ${sg.estimated_value.toFixed(2)}€</div></div>`
+  ).join('') : '<p style="color:var(--text-dim)">Aucune suggestion</p>';
+}
+function showHarvestForm(lineId) {
+  document.getElementById('lineSelect').value = lineId;
+  document.getElementById('harvestForm').scrollIntoView({behavior:'smooth'});
+}
+async function createHarvest(e) {
+  e.preventDefault();
+  const data = {
+    line_id: document.getElementById('lineSelect').value,
+    weight_kg: parseFloat(document.getElementById('weightInput').value),
+    unit_price: parseFloat(document.getElementById('priceInput').value) || null,
+    quality: document.getElementById('qualitySelect').value,
+    harvest_date: document.getElementById('dateInput').value || null,
+  };
+  const r = await fetch('/api/harvest/batches', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+  if (r.ok) { load(); document.getElementById('harvestForm').reset(); }
+  else { const e = await r.json(); alert(e.error); }
+}
+load();
+setInterval(load, 30000);
+</script>
+{% endblock %}

@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% block title %}Laboratoire - PixelOS{% endblock %}
+{% block content %}
+<style>
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+.card h3 { font-size: 13px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.card .value { font-size: 28px; font-weight: 700; }
+.card .value.green { color: var(--green); }
+.card .value.blue { color: var(--blue); }
+.card .value.orange { color: var(--orange); }
+.tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+.tab { padding: 10px 20px; cursor: pointer; font-size: 14px; color: var(--text-dim); border-bottom: 2px solid transparent; transition: 0.15s; }
+.tab.active { color: var(--text); border-bottom-color: var(--green); }
+.tab:hover { color: var(--text); }
+.panel { display: none; }
+.panel.active { display: block; }
+input, select, textarea { width: 100%; padding: 10px 12px; margin-bottom: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 14px; }
+label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.row { display: flex; gap: 12px; }
+.row > * { flex: 1; }
+.item { padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.item:last-child { border-bottom: none; }
+.empty { color: var(--text-dim); text-align: center; padding: 40px 0; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+table { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 8px; border-collapse: collapse; overflow: hidden; }
+th { text-align: left; padding: 10px 14px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); border-bottom: 1px solid var(--border); }
+td { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+tr:last-child td { border-bottom: none; }
+.modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; max-width: 500px; width: 90%; }
+.modal h2 { margin-bottom: 16px; font-size: 18px; }
+</style>
+
+<div class="toolbar">
+  <h2 style="flex:1;font-size:20px;"><span>&#x1F52C;</span> Laboratoire</h2>
+  <select id="labFilter" style="width:auto;" onchange="refreshAll()">
+    <option value="">Tous les types</option>
+    <option value="sol">Sol</option>
+    <option value="eau">Eau</option>
+    <option value="plante">Plante</option>
+    <option value="tissu">Tissu</option>
+  </select>
+  <button class="btn-green" onclick="showModal('sampleModal')">+ Échantillon</button>
+  <button class="btn-blue" onclick="refreshAll()">&#x21bb;</button>
+</div>
+
+<div class="grid" id="statsGrid"></div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('samples',this)">Échantillons</div>
+  <div class="tab" onclick="switchTab('soil',this)">Analyse Sol</div>
+  <div class="tab" onclick="switchTab('microbiome',this)">Microbiome</div>
+  <div class="tab" onclick="switchTab('microscopy',this)">Microscopie</div>
+  <div class="tab" onclick="switchTab('growth',this)">Croissance</div>
+  <div class="tab" onclick="switchTab('genetics',this)">Génétique</div>
+</div>
+
+<div id="panel-samples" class="panel active"><div class="empty">Chargement...</div></div>
+<div id="panel-soil" class="panel"><div class="empty">Chargement...</div></div>
+<div id="panel-microbiome" class="panel"><div class="empty">Chargement...</div></div>
+<div id="panel-microscopy" class="panel"><div class="empty">Chargement...</div></div>
+<div id="panel-growth" class="panel"><div class="empty">Chargement...</div></div>
+<div id="panel-genetics" class="panel"><div class="empty">Chargement...</div></div>
+
+<div id="sampleModal" class="modal-bg" style="display:none;" onclick="if(event.target===this)hideModal('sampleModal')">
+  <div class="modal">
+    <h2>Nouvel échantillon</h2>
+    <label>Type</label><select id="sampType"><option value="sol">Sol</option><option value="eau">Eau</option><option value="plante">Plante</option><option value="tissu">Tissu</option></select>
+    <label>Source</label><input id="sampSource" placeholder="Parcelle A3">
+    <label>Localisation</label><input id="sampLocation" placeholder="Serre nord">
+    <label>Préleveur</label><input id="sampCollector" placeholder="Nom">
+    <div class="row">
+      <div><label>Profondeur (cm)</label><input id="sampDepth" type="number"></div>
+      <div><label>Masse (g)</label><input id="sampMass" type="number" step="0.1"></div>
+    </div>
+    <label>Notes</label><textarea id="sampNotes" rows="2"></textarea>
+    <div class="row"><button class="btn-green" onclick="createSample()">Enregistrer</button><button class="btn-red" onclick="hideModal('sampleModal')">Annuler</button></div>
+  </div>
+</div>
+
+<div id="soilModal" class="modal-bg" style="display:none;" onclick="if(event.target===this)hideModal('soilModal')">
+  <div class="modal"><h2>Analyse de sol</h2><div id="soilForm"></div></div>
+</div>
+
+<div id="microModal" class="modal-bg" style="display:none;" onclick="if(event.target===this)hideModal('microModal')">
+  <div class="modal"><h2>Analyse microbiome</h2><div id="microForm"></div></div>
+</div>
+
+<script>
+async function api(url, opts={}) {
+  const r = await fetch(url, { headers:{'Content-Type':'application/json'}, ...opts });
+  return r.json();
+}
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+  loadTab(name);
+}
+function showModal(id) { document.getElementById(id).style.display = 'flex'; }
+function hideModal(id) { document.getElementById(id).style.display = 'none'; }
+
+async function refreshAll() {
+  const [stats] = await Promise.all([api('/api/lab/stats'), loadTab('samples')]);
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="card"><h3>Échantillons</h3><div class="value blue">${stats.total_samples || 0}</div></div>
+    <div class="card"><h3>Analyses sol</h3><div class="value orange">${stats.total_soil_analyses || 0}</div></div>
+    <div class="card"><h3>Microbiomes</h3><div class="value green">${stats.total_microbiomes || 0}</div></div>
+    <div class="card"><h3>Microscopies</h3><div class="value">${stats.total_microscopies || 0}</div></div>
+    <div class="card"><h3>Suivis croissance</h3><div class="value green">${stats.total_growth_tracks || 0}</div></div>
+    <div class="card"><h3>Profils génétiques</h3><div class="value blue">${stats.total_genetic_profiles || 0}</div></div>`;
+}
+
+let samples = [];
+
+async function loadTab(name) {
+  if (name === 'samples') return loadSamples();
+  if (name === 'soil') return loadSoil();
+  if (name === 'microbiome') return loadMicrobiome();
+  if (name === 'microscopy') return loadMicroscopy();
+  if (name === 'growth') return loadGrowth();
+  if (name === 'genetics') return loadGenetics();
+}
+
+async function loadSamples() {
+  const filter = document.getElementById('labFilter').value;
+  const data = await api('/api/lab/samples?type=' + filter);
+  samples = data.samples || [];
+  document.getElementById('panel-samples').innerHTML = samples.length
+    ? `<table><tr><th>ID</th><th>Type</th><th>Source</th><th>Localisation</th><th>Statut</th><th>Date</th><th></th></tr>${
+        samples.map(s => `<tr>
+          <td style="font-family:monospace;font-size:12px;">${(s.id || '').slice(0,12)}</td>
+          <td><span class="badge sensor">${s.sample_type || ''}</span></td>
+          <td>${s.source || ''}</td>
+          <td>${s.location || ''}</td>
+          <td><span class="badge ${s.status === 'analysé' ? 'ok' : ''}" style="${s.status !== 'analysé' ? 'background:rgba(210,153,34,0.15);color:var(--orange);' : ''}">${s.status || 'prélevé'}</span></td>
+          <td style="color:var(--text-dim);font-size:12px;">${(s.created_at || '').slice(0,10)}</td>
+          <td><button class="btn-blue btn-sm" onclick="viewSample('${s.id}')">Voir</button></td>
+        </tr>`).join('')}</table>`
+    : '<div class="empty">Aucun échantillon</div>';
+}
+
+async function createSample() {
+  const body = { sample_type: document.getElementById('sampType').value, source: document.getElementById('sampSource').value, location: document.getElementById('sampLocation').value, collector: document.getElementById('sampCollector').value, depth_cm: parseFloat(document.getElementById('sampDepth').value) || null, mass_g: parseFloat(document.getElementById('sampMass').value) || null, notes: document.getElementById('sampNotes').value };
+  await api('/api/lab/samples', { method:'POST', body:JSON.stringify(body) });
+  hideModal('sampleModal'); refreshAll();
+}
+
+async function viewSample(id) {
+  const s = await api('/api/lab/samples/' + id);
+  alert(JSON.stringify(s, null, 2));
+}
+
+async function loadSoil() {
+  const data = await api('/api/lab/samples?type=sol');
+  const list = data.samples || [];
+  document.getElementById('panel-soil').innerHTML = list.length
+    ? `<table><tr><th>Échantillon</th><th>pH</th><th>Matière org.</th><th>N</th><th>P</th><th>K</th><th>Texture</th><th></th></tr>${
+        list.map(s => `<tr><td style="font-family:monospace;font-size:12px;">${(s.id||'').slice(0,12)}</td>
+          <td>${s.ph || '—'}</td><td>${s.matiere_organique || '—'}</td>
+          <td>${s.azote || '—'}</td><td>${s.phosphore || '—'}</td>
+          <td>${s.potassium || '—'}</td><td>${s.texture || '—'}</td>
+          <td><button class="btn-orange btn-sm" onclick="showSoilForm('${s.id}')">Analyser</button></td></tr>`).join('')}</table>`
+    : '<div class="empty">Aucune analyse de sol</div>';
+}
+
+async function showSoilForm(sampleId) {
+  const s = await api('/api/lab/samples/' + sampleId);
+  document.getElementById('soilForm').innerHTML = `
+    <p style="margin-bottom:12px;">Échantillon: <strong>${(s.id||'').slice(0,12)}</strong> — ${s.source||''}</p>
+    <div class="row"><div><label>pH</label><input id="soilPh" type="number" step="0.1"></div>
+    <div><label>Conductivité (µS/cm)</label><input id="soilEc" type="number"></div></div>
+    <div class="row"><div><label>Matière organique (%)</label><input id="soilMo" type="number" step="0.1"></div>
+    <div><label>Azote (mg/kg)</label><input id="soilN" type="number"></div></div>
+    <div class="row"><div><label>Phosphore (mg/kg)</label><input id="soilP" type="number"></div>
+    <div><label>Potassium (mg/kg)</label><input id="soilK" type="number"></div></div>
+    <div class="row"><div><label>Texture</label><select id="soilText"><option value="limoneux">Limoneux</option><option value="argileux">Argileux</option><option value="sableux">Sableux</option><option value="humifere">Humifère</option></select></div>
+    <div><label>CEC (méq/100g)</label><input id="soilCec" type="number" step="0.1"></div></div>
+    <label>Notes</label><textarea id="soilNotes" rows="2"></textarea>
+    <div class="row"><button class="btn-green" onclick="saveSoilAnalysis('${sampleId}')">Enregistrer</button><button class="btn-red" onclick="hideModal('soilModal')">Annuler</button></div>`;
+  showModal('soilModal');
+}
+
+async function saveSoilAnalysis(sampleId) {
+  const body = { sample_id: sampleId, ph: parseFloat(document.getElementById('soilPh').value) || null, conductivite_us_cm: parseFloat(document.getElementById('soilEc').value) || null, matiere_organique_pct: parseFloat(document.getElementById('soilMo').value) || null, azote_mg_kg: parseFloat(document.getElementById('soilN').value) || null, phosphore_mg_kg: parseFloat(document.getElementById('soilP').value) || null, potassium_mg_kg: parseFloat(document.getElementById('soilK').value) || null, texture: document.getElementById('soilText').value, cec_meq_100g: parseFloat(document.getElementById('soilCec').value) || null, notes: document.getElementById('soilNotes').value };
+  await api('/api/lab/soil', { method:'POST', body:JSON.stringify(body) });
+  hideModal('soilModal'); refreshAll();
+}
+
+async function loadMicrobiome() {
+  const data = await api('/api/lab/samples');
+  const list = data.samples || [];
+  document.getElementById('panel-microbiome').innerHTML = list.length
+    ? `<table><tr><th>Échantillon</th><th>Bactéries</th><th>Champignons</th><th>Diversité</th><th></th></tr>${
+        list.map(s => `<tr><td style="font-family:monospace;font-size:12px;">${(s.id||'').slice(0,12)}</td>
+          <td>${s.bacteria_g_per_g || '—'}</td><td>${s.fungi_g_per_g || '—'}</td>
+          <td>${s.shannon_index || '—'}</td>
+          <td><button class="btn-orange btn-sm" onclick="showMicroForm('${s.id}')">Analyser</button></td></tr>`).join('')}</table>`
+    : '<div class="empty">Aucune analyse microbiome</div>';
+}
+
+async function showMicroForm(sampleId) {
+  const s = await api('/api/lab/samples/' + sampleId);
+  document.getElementById('microForm').innerHTML = `
+    <p style="margin-bottom:12px;">Échantillon: <strong>${(s.id||'').slice(0,12)}</strong></p>
+    <div class="row"><div><label>Bactéries (g/g)</label><input id="micBac" type="number" step="0.01"></div>
+    <div><label>Champignons (g/g)</label><input id="micFun" type="number" step="0.01"></div></div>
+    <div class="row"><div><label>Rapport B/F</label><input id="micBf" type="number" step="0.01"></div>
+    <div><label>Shannon</label><input id="micShan" type="number" step="0.01"></div></div>
+    <div class="row"><div><label>Activité microbienne</label><input id="micAct" type="number" step="0.1"></div>
+    <div><label>Biomasse (µg/g)</label><input id="micBio" type="number"></div></div>
+    <label>Méthode</label><select id="micMeth"><option value="qpcr">qPCR</option><option value="plq">PLQ</option><option value="sequencage">Séquençage</option></select>
+    <div class="row"><button class="btn-green" onclick="saveMicro('${sampleId}')">Enregistrer</button><button class="btn-red" onclick="hideModal('microModal')">Annuler</button></div>`;
+  showModal('microModal');
+}
+
+async function saveMicro(sampleId) {
+  const body = { sample_id: sampleId, bacteria_g_per_g: parseFloat(document.getElementById('micBac').value) || null, fungi_g_per_g: parseFloat(document.getElementById('micFun').value) || null, bf_ratio: parseFloat(document.getElementById('micBf').value) || null, shannon_index: parseFloat(document.getElementById('micShan').value) || null, microbial_activity: parseFloat(document.getElementById('micAct').value) || null, biomass_ug_g: parseFloat(document.getElementById('micBio').value) || null, method: document.getElementById('micMeth').value };
+  await api('/api/lab/microbiome', { method:'POST', body:JSON.stringify(body) });
+  hideModal('microModal'); refreshAll();
+}
+
+async function loadMicroscopy() {
+  const data = await api('/api/lab/samples');
+  const list = data.samples || [];
+  document.getElementById('panel-microscopy').innerHTML = list.length
+    ? `<table><tr><th>Échantillon</th><th>Type</th><th>Observation</th><th>Date</th></tr>${
+        list.map(s => `<tr><td style="font-family:monospace;font-size:12px;">${(s.id||'').slice(0,12)}</td>
+          <td>${s.sample_type || ''}</td><td>${s.observation || '—'}</td>
+          <td style="color:var(--text-dim);font-size:12px;">${(s.created_at||'').slice(0,10)}</td></tr>`).join('')}</table>`
+    : '<div class="empty">Aucune observation</div>';
+}
+
+async function loadGrowth() {
+  const data = await api('/api/cultivation/status');
+  const status = data || {};
+  document.getElementById('panel-growth').innerHTML = `<div class="grid">
+    <div class="card"><h3>En croissance</h3><div class="value green">${status.active_plantations || 0}</div></div>
+    <div class="card"><h3>Stades</h3><div class="value blue">${Object.keys(status.stages || {}).length || 0}</div></div>
+  </div>`;
+}
+
+async function loadGenetics() {
+  const data = await api('/api/lab/samples');
+  const list = data.samples || [];
+  document.getElementById('panel-genetics').innerHTML = list.length
+    ? `<table><tr><th>Échantillon</th><th>Espèce</th><th>Variété</th><th>Marqueurs</th></tr>${
+        list.map(s => `<tr><td style="font-family:monospace;font-size:12px;">${(s.id||'').slice(0,12)}</td>
+          <td>${s.species || '—'}</td><td>${s.variety || '—'}</td>
+          <td>${(s.genetic_markers || []).length || '—'}</td></tr>`).join('')}</table>`
+    : '<div class="empty">Aucun profil génétique</div>';
+}
+
+refreshAll();
+</script>
+{% endblock %}

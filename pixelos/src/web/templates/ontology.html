@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Ontologie - PixelOS{% endblock %}
+{% block content %}
+<style>
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+.card h3 { font-size: 13px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.card .value { font-size: 28px; font-weight: 700; }
+.card .value.green { color: var(--green); }
+.card .value.blue { color: var(--blue); }
+.tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+.tab { padding: 10px 20px; cursor: pointer; font-size: 14px; color: var(--text-dim); border-bottom: 2px solid transparent; transition: 0.15s; }
+.tab.active { color: var(--text); border-bottom-color: var(--green); }
+.tab:hover { color: var(--text); }
+.panel { display: none; }
+.panel.active { display: block; }
+input, select, textarea { width: 100%; padding: 10px 12px; margin-bottom: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 14px; }
+label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.row { display: flex; gap: 12px; }
+.row > * { flex: 1; }
+.empty { color: var(--text-dim); text-align: center; padding: 40px 0; }
+table { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 8px; border-collapse: collapse; overflow: hidden; }
+th { text-align: left; padding: 10px 14px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); border-bottom: 1px solid var(--border); }
+td { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+tr:last-child td { border-bottom: none; }
+.result-box { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-top: 12px; font-family: monospace; font-size: 13px; white-space: pre-wrap; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; max-width: 600px; width: 90%; }
+.modal h2 { margin-bottom: 16px; font-size: 18px; }
+</style>
+
+<div class="toolbar">
+  <h2 style="flex:1;font-size:20px;"><span>&#x1F333;</span> Ontologie Végétale</h2>
+  <button class="btn-green" onclick="showModal('traitModal')">+ Trait</button>
+  <button class="btn-blue" onclick="refreshAll()">&#x21bb;</button>
+</div>
+
+<div class="grid" id="statsGrid"></div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('traits',this)">Traits</div>
+  <div class="tab" onclick="switchTab('compare',this)">Comparer</div>
+  <div class="tab" onclick="switchTab('exchanges',this)">Échanges</div>
+</div>
+
+<div id="panel-traits" class="panel active"><div class="empty">Chargement...</div></div>
+<div id="panel-compare" class="panel">
+  <div class="card" style="max-width:600px;">
+    <h3 style="margin-bottom:12px;">Comparer deux espèces</h3>
+    <label>Espèce A</label><input id="compA" placeholder="ID espèce">
+    <label>Espèce B</label><input id="compB" placeholder="ID espèce">
+    <button class="btn-green" onclick="runCompare()">Comparer</button>
+    <div id="compResult"></div>
+  </div>
+</div>
+<div id="panel-exchanges" class="panel"><div class="empty">Chargement...</div></div>
+
+<div id="traitModal" class="modal-bg" style="display:none;" onclick="if(event.target===this)hideModal('traitModal')">
+  <div class="modal">
+    <h2>Nouveau trait</h2>
+    <label>ID Espèce</label><input id="traitSpecies" placeholder="ex: solanum_lycopersicum">
+    <div class="row"><div><label>Type</label><select id="traitType"><option value="morphologique">Morphologique</option><option value="physiologique">Physiologique</option><option value="phénologique">Phénologique</option></select></div>
+    <div><label>Valeur</label><input id="traitValue" placeholder="ex: déterminé"></div></div>
+    <label>Description</label><textarea id="traitDesc" rows="2"></textarea>
+    <div class="row"><button class="btn-green" onclick="createTrait()">Enregistrer</button><button class="btn-red" onclick="hideModal('traitModal')">Annuler</button></div>
+  </div>
+</div>
+
+<script>
+async function api(url, opts={}) {
+  const r = await fetch(url, { headers:{'Content-Type':'application/json'}, ...opts });
+  return r.json();
+}
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+  if (name === 'traits') loadTraits();
+  if (name === 'exchanges') loadExchanges();
+}
+function showModal(id) { document.getElementById(id).style.display = 'flex'; }
+function hideModal(id) { document.getElementById(id).style.display = 'none'; }
+
+async function refreshAll() {
+  const [stats] = await Promise.all([api('/api/ontology/stats'), loadTraits()]);
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="card"><h3>Espèces</h3><div class="value green">${stats.total_species || 0}</div></div>
+    <div class="card"><h3>Traits</h3><div class="value blue">${stats.total_traits || 0}</div></div>
+    <div class="card"><h3>Échanges</h3><div class="value">${stats.total_exchanges || 0}</div></div>`;
+}
+
+async function loadTraits() {
+  const data = await api('/api/ontology/traits');
+  const list = data.species || [];
+  document.getElementById('panel-traits').innerHTML = list.length
+    ? `<table><tr><th>Espèce</th><th>Nom commun</th><th>Famille</th><th>Cycle</th><th>Hauteur</th><th></th></tr>${
+        list.map(s => `<tr>
+          <td><strong>${s.species_id || s.id || '—'}</strong></td>
+          <td>${s.common_name || '—'}</td>
+          <td>${s.family || '—'}</td>
+          <td>${s.growth_cycle || '—'}</td>
+          <td>${s.height_cm ? s.height_cm + ' cm' : '—'}</td>
+          <td><button class="btn-blue btn-sm" onclick="viewTrait('${s.species_id || s.id}')">Détails</button></td>
+        </tr>`).join('')}</table>`
+    : '<div class="empty">Aucune espèce référencée</div>';
+}
+
+async function viewTrait(id) {
+  const data = await api('/api/ontology/traits/' + id);
+  document.getElementById('panel-traits').innerHTML += `<div class="result-box">${JSON.stringify(data, null, 2)}</div>`;
+}
+
+async function createTrait() {
+  const body = { species_id: document.getElementById('traitSpecies').value, trait_type: document.getElementById('traitType').value, value: document.getElementById('traitValue').value, description: document.getElementById('traitDesc').value };
+  if (!body.species_id) return;
+  await api('/api/ontology/traits', { method:'POST', body:JSON.stringify(body) });
+  hideModal('traitModal'); refreshAll();
+}
+
+async function runCompare() {
+  const a = document.getElementById('compA').value.trim();
+  const b = document.getElementById('compB').value.trim();
+  if (!a || !b) { document.getElementById('compResult').innerHTML = '<div class="result-box" style="color:var(--red);">Les deux espèces sont requises</div>'; return; }
+  const data = await api('/api/ontology/compare', { method:'POST', body:JSON.stringify({species_a:a, species_b:b}) });
+  document.getElementById('compResult').innerHTML = `<div class="result-box">${JSON.stringify(data, null, 2)}</div>`;
+}
+
+async function loadExchanges() {
+  const data = await api('/api/ontology/exchanges');
+  const list = data.exchanges || [];
+  document.getElementById('panel-exchanges').innerHTML = list.length
+    ? `<table><tr><th>Espèce</th><th>Direction</th><th>Partenaire</th><th>Date</th><th>Statut</th></tr>${
+        list.map(e => `<tr><td>${e.species || '—'}</td>
+          <td><span class="badge sensor">${e.direction || '—'}</span></td>
+          <td>${e.partner || '—'}</td>
+          <td style="color:var(--text-dim);font-size:12px;">${(e.date||'').slice(0,10)}</td>
+          <td><span class="badge ${e.status === 'complété' ? 'ok' : ''}">${e.status || '—'}</span></td></tr>`).join('')}</table>`
+    : '<div class="empty">Aucun échange</div>';
+}
+
+refreshAll();
+</script>
+{% endblock %}

@@ -1,0 +1,425 @@
+{% extends "base.html" %}
+{% block title %}Marché PixelOS{% endblock %}
+{% block content %}
+<style>
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+  .card h3 { font-size: 14px; color: var(--text-dim); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .card .value { font-size: 28px; font-weight: 700; }
+  .card .value.green { color: var(--green); }
+  .card .sub { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+  .listing { border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px; background: var(--card); }
+  .listing .head { display: flex; justify-content: space-between; align-items: start; }
+  .listing .title { font-size: 16px; font-weight: 600; }
+  .listing .price { font-size: 20px; font-weight: 700; color: var(--green); }
+  .listing .price small { font-weight: 400; font-size: 13px; color: var(--text-dim); }
+  .listing .meta { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+  .listing .desc { font-size: 13px; margin-top: 8px; color: var(--text-dim); }
+  .listing .tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .listing .tags span { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .tag-organic { background: rgba(63,185,80,0.15); color: var(--green); }
+  .tag-category { background: rgba(88,166,255,0.15); color: var(--blue); }
+  .tag-location { background: rgba(210,153,34,0.15); color: var(--orange); }
+  .tag-type { background: rgba(139,148,158,0.15); color: var(--text-dim); }
+  input, select, textarea { width: 100%; padding: 10px 12px; margin-bottom: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 14px; font-family: inherit; }
+  label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .row { display: flex; gap: 12px; }
+  .row > * { flex: 1; }
+  .tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .tab { padding: 10px 20px; cursor: pointer; font-size: 14px; color: var(--text-dim); border-bottom: 2px solid transparent; transition: 0.15s; }
+  .tab.active { color: var(--text); border-bottom-color: var(--green); }
+  .tab:hover { color: var(--text); }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .order-item { padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .order-item:last-child { border-bottom: none; }
+  .empty { color: var(--text-dim); text-align: center; padding: 40px 0; }
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; min-width: 360px; max-width: 500px; }
+  .modal h2 { margin-bottom: 16px; font-size: 18px; }
+  .search-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .search-row input { flex: 1; margin-bottom: 0; }
+  .search-row select { width: auto; margin-bottom: 0; }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 20px; font-size: 14px; z-index: 200; animation: fadeIn 0.3s; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  a.blue-link { color: var(--blue); cursor: pointer; text-decoration: none; }
+  a.blue-link:hover { text-decoration: underline; }
+  .catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+  .catalog-item { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
+  .catalog-item .icon { font-size: 32px; margin-bottom: 8px; }
+  .catalog-item .name { font-size: 14px; font-weight: 600; }
+  .catalog-item .price { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+  .catalog-item .cat { font-size: 11px; color: var(--text-dim); }
+</style>
+
+<div class="toolbar">
+  <h2 style="flex:1;font-size:20px;display:flex;align-items:center;gap:8px;">
+    <span>&#x1F6D2;</span> Marché PixelOS <span style="font-size:12px;color:var(--text-dim);font-weight:400;">P2P · Zéro commission</span>
+  </h2>
+  <button class="btn-green" onclick="showModal('createListingModal')">+ Vendre</button>
+  <button class="btn-blue" onclick="showModal('addCatalogModal')">+ Catalogue</button>
+  <button class="btn-green" onclick="refreshAll()">&#x21bb;</button>
+</div>
+
+<div class="grid">
+  <div class="card"><h3>Annonces</h3><div class="value blue" id="listingCount">0</div><div class="sub">actives</div></div>
+  <div class="card"><h3>Commandes</h3><div class="value" id="orderCount">0</div><div class="sub">totales</div></div>
+  <div class="card"><h3>Produits au catalogue</h3><div class="value green" id="catalogCount">0</div></div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('browse',this)">Parcourir</div>
+  <div class="tab" onclick="switchTab('my',this)">Mes annonces</div>
+  <div class="tab" onclick="switchTab('orders',this)">Mes commandes</div>
+  <div class="tab" onclick="switchTab('catalog',this)">Catalogue</div>
+</div>
+
+<div id="panel-browse" class="panel active">
+  <div class="search-row">
+    <input id="searchInput" placeholder="Rechercher...">
+    <select id="categoryFilter" onchange="loadListings()">
+      <option value="">Toutes catégories</option>
+      <option value="legume">Légume</option>
+      <option value="fruit">Fruit</option>
+      <option value="semence">Semence</option>
+      <option value="plante">Plante</option>
+      <option value="outil">Outil</option>
+      <option value="service">Service</option>
+      <option value="autre">Autre</option>
+    </select>
+    <select id="typeFilter" onchange="loadListings()">
+      <option value="">Tous types</option>
+      <option value="vente">Vente</option>
+      <option value="echange">Échange</option>
+      <option value="don">Don</option>
+    </select>
+    <button class="btn-blue" onclick="loadListings()">Chercher</button>
+  </div>
+  <div id="listingContainer"></div>
+</div>
+
+<div id="panel-my" class="panel">
+  <div id="myListingsContainer"><div class="empty">Connectez votre portefeuille pour voir vos annonces</div></div>
+</div>
+
+<div id="panel-orders" class="panel">
+  <div class="toolbar">
+    <select id="orderFilter" onchange="loadOrders()" style="width:auto;">
+      <option value="">Tous</option>
+      <option value="en_attente">En attente</option>
+      <option value="confirmée">Confirmée</option>
+      <option value="expédiée">Expédiée</option>
+      <option value="livrée">Livrée</option>
+      <option value="annulée">Annulée</option>
+    </select>
+  </div>
+  <div id="myOrdersContainer"><div class="empty">Aucune commande</div></div>
+</div>
+
+<div id="panel-catalog" class="panel">
+  <div class="search-row">
+    <input id="catalogSearch" placeholder="Rechercher dans le catalogue...">
+    <select id="catalogCategoryFilter" onchange="loadCatalog()">
+      <option value="">Tous</option>
+      <option value="legume">Légume</option>
+      <option value="fruit">Fruit</option>
+      <option value="semence">Semence</option>
+      <option value="plante">Plante</option>
+      <option value="outil">Outil</option>
+      <option value="service">Service</option>
+    </select>
+    <button class="btn-blue" onclick="loadCatalog()">Chercher</button>
+  </div>
+  <div id="catalogContainer"></div>
+</div>
+
+<div id="createListingModal" class="modal-bg" style="display:none;" onclick="if(event.target===this)hideModal('createListingModal')">
+  <div class="modal">
+    <h2>Nouvelle annonce</h2>
+    <label>Produit</label>
+    <input id="listingProduct" placeholder="Tomates cerises">
+    <div class="row">
+      <div><label>Prix (BRT)</label><input id="listingPrice" type="number" step="0.01" min="0"></div>
+      <div><label>Quantité (kg)</label><input id="listingQty" type="number" step="0.1" min="0.1" value="1"></div>
+    </div>
+    <div class="row">
+      <div><label>Catégorie</label><select id="listingCategory"><option value="legume">Légume</option><option value="fruit">Fruit</option><option value="semence">Semence</option><option value="plante">Plante</option><option value="outil">Outil</option><option value="service">Service</option><option value="autre">Autre</option></select></div>
+      <div><label>Type</label><select id="listingType"><option value="vente">Vente</option><option value="echange">Échange</option><option value="don">Don</option></select></div>
+    </div>
+    <label>Description</label>
+    <textarea id="listingDesc" rows="2" placeholder="Description du produit..."></textarea>
+    <div class="row">
+      <div><label>Variété</label><input id="listingVariety" placeholder="Cerise"></div>
+      <div><label>Localisation</label><input id="listingLocation" placeholder="Safi, Maroc"></div>
+    </div>
+    <label><input id="listingOrganic" type="checkbox"> Agriculture biologique</label>
+    <div class="row">
+      <button class="btn-green" onclick="createListing()">Publier</button>
+      <button class="btn-red" onclick="hideModal('createListingModal')">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<div id="addCatalogModal" class="modal-bg" style="display:none;" onclick="if(event.target===this)hideModal('addCatalogModal')">
+  <div class="modal">
+    <h2>Ajouter au catalogue</h2>
+    <label>Nom du produit</label>
+    <input id="catName" placeholder="Tomate">
+    <div class="row">
+      <div><label>Catégorie</label><select id="catCategory"><option value="legume">Légume</option><option value="fruit">Fruit</option><option value="semence">Semence</option><option value="plante">Plante</option><option value="outil">Outil</option><option value="service">Service</option></select></div>
+      <div><label>Unité</label><input id="catUnit" value="kg"></div>
+    </div>
+    <label>Description</label>
+    <textarea id="catDesc" rows="2"></textarea>
+    <div class="row">
+      <div><label>Prix indicatif (BRT)</label><input id="catPrice" type="number" step="0.01" min="0"></div>
+      <div><label>Variété</label><input id="catVariety" placeholder="Cœur de bœuf"></div>
+    </div>
+    <div class="row">
+      <button class="btn-green" onclick="addToCatalog()">Ajouter</button>
+      <button class="btn-red" onclick="hideModal('addCatalogModal')">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<div id="detailModal" class="modal-bg" style="display:none;" onclick="if(event.target===this)hideModal('detailModal')">
+  <div class="modal" id="detailContent" style="min-width:420px;"></div>
+</div>
+
+<div id="toast" class="toast" style="display:none;"></div>
+
+<script>
+let listings = [];
+let myListings = [];
+let myOrders = [];
+
+function toast(msg, color='var(--green)') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.borderLeftColor = color; t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3000);
+}
+
+function showModal(id) { document.getElementById(id).style.display = 'flex'; }
+function hideModal(id) { document.getElementById(id).style.display = 'none'; }
+
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+}
+
+async function api(url, opts={}) {
+  const r = await fetch(url, { headers:{'Content-Type':'application/json'}, ...opts });
+  return r.json();
+}
+
+async function refreshAll() {
+  await Promise.all([loadListings(), loadCatalog()]);
+  toast('Données actualisées');
+}
+
+// ── Browse ──
+
+async function loadListings() {
+  try {
+    const q = document.getElementById('searchInput').value;
+    const category = document.getElementById('categoryFilter').value;
+    const type = document.getElementById('typeFilter').value;
+    let url = '/api/web3/exchange/listings?';
+    if (q) url += 'q=' + encodeURIComponent(q) + '&';
+    if (category) url += 'category=' + category + '&';
+    if (type) url += 'type=' + type;
+    const data = await api(url);
+    listings = data.listings || [];
+    document.getElementById('listingCount').textContent = listings.length;
+    renderListings();
+  } catch(e) { console.error(e); }
+}
+
+function renderListings() {
+  const container = document.getElementById('listingContainer');
+  if (!listings.length) {
+    container.innerHTML = '<div class="empty">Aucune annonce trouvée</div>';
+    return;
+  }
+  container.innerHTML = listings.map(l => `
+    <div class="listing">
+      <div class="head">
+        <div>
+          <div class="title">${l.product_name}</div>
+          <div class="meta">${l.seller ? l.seller.slice(0,10)+'...' : ''} · ${l.quantity_kg} kg</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="price">${l.price_brt} <small>BRT</small></div>
+          <button class="btn-green btn-sm" onclick="buyListing('${l.id}')">Acheter</button>
+        </div>
+      </div>
+      ${l.description ? `<div class="desc">${l.description}</div>` : ''}
+      <div class="tags">
+        <span class="tag-category">${l.category || 'général'}</span>
+        <span class="tag-type">${l.type || 'vente'}</span>
+        ${l.organic ? '<span class="tag-organic">Bio</span>' : ''}
+        ${l.variety ? `<span class="tag-location">${l.variety}</span>` : ''}
+        ${l.location ? `<span class="tag-location">${l.location}</span>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function buyListing(listingId) {
+  const res = await api('/api/web3/exchange/order', { method:'POST', body:JSON.stringify({listing_id:listingId}) });
+  if (res.error) { toast(res.error, 'var(--red)'); return; }
+  toast('Commande créée !');
+  loadListings();
+  loadOrders();
+}
+
+async function createListing() {
+  const product_name = document.getElementById('listingProduct').value;
+  const price_brt = parseFloat(document.getElementById('listingPrice').value);
+  const quantity_kg = parseFloat(document.getElementById('listingQty').value);
+  const category = document.getElementById('listingCategory').value;
+  const type = document.getElementById('listingType').value;
+  const description = document.getElementById('listingDesc').value;
+  const variety = document.getElementById('listingVariety').value;
+  const location = document.getElementById('listingLocation').value;
+  const organic = document.getElementById('listingOrganic').checked;
+  if (!product_name || !price_brt) { toast('Nom et prix requis', 'var(--red)'); return; }
+  const res = await api('/api/web3/exchange/listing', { method:'POST', body:JSON.stringify({product_name, price_brt, quantity_kg, category, type, description, variety, location, organic}) });
+  if (res.error) { toast(res.error, 'var(--red)'); return; }
+  hideModal('createListingModal');
+  toast('Annonce publiée !');
+  loadListings();
+}
+
+// ── My Listings ──
+
+async function loadMyListings() {
+  try {
+    const wallets = await api('/api/web3/wallet/list');
+    const defaultWallet = wallets.wallets?.find(w => w.default);
+    if (!defaultWallet) { document.getElementById('myListingsContainer').innerHTML = '<div class="empty">Aucun portefeuille principal défini</div>'; return; }
+    const data = await api('/api/web3/exchange/my-listings?seller=' + defaultWallet.address);
+    myListings = data.listings || [];
+    if (!myListings.length) {
+      document.getElementById('myListingsContainer').innerHTML = '<div class="empty">Vous n\'avez pas encore d\'annonces</div>';
+      return;
+    }
+    document.getElementById('myListingsContainer').innerHTML = myListings.map(l => `
+      <div class="listing">
+        <div class="head">
+          <div>
+            <div class="title">${l.product_name}</div>
+            <div class="meta">${l.quantity_kg} kg · ${l.status || 'active'}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="price">${l.price_brt} <small>BRT</small></div>
+            <button class="btn-red btn-sm" onclick="deleteListing('${l.id}')">Retirer</button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function deleteListing(listingId) {
+  await api('/api/web3/exchange/listing/' + listingId, { method:'PUT', body:JSON.stringify({status:'retirée'}) });
+  toast('Annonce retirée');
+  loadMyListings();
+}
+
+// ── Orders ──
+
+async function loadOrders() {
+  try {
+    const wallets = await api('/api/web3/wallet/list');
+    const defaultWallet = wallets.wallets?.find(w => w.default);
+    if (!defaultWallet) { return; }
+    const data = await api('/api/web3/exchange/my-orders?address=' + defaultWallet.address);
+    const all = [...(data.as_buyer || []), ...(data.as_seller || [])];
+    myOrders = all;
+    document.getElementById('orderCount').textContent = myOrders.length;
+    const filter = document.getElementById('orderFilter').value;
+    let list = myOrders;
+    if (filter) list = list.filter(o => o.status === filter);
+    const container = document.getElementById('myOrdersContainer');
+    if (!list.length) {
+      container.innerHTML = '<div class="empty">Aucune commande</div>';
+      return;
+    }
+    container.innerHTML = list.map(o => `
+      <div class="order-item">
+        <div style="display:flex;justify-content:space-between;">
+          <span><strong>${o.listing || o.product_name || 'Commande'}</strong></span>
+          <span class="wallet-bal">${o.total_brt} <small>BRT</small></span>
+        </div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:4px;">
+          ${o.buyer ? 'Acheteur: ' + o.buyer.slice(0,10)+'...' : ''}
+          ${o.seller ? 'Vendeur: ' + o.seller.slice(0,10)+'...' : ''}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:6px;">
+          <span class="badge" style="background:rgba(210,153,34,0.15);color:var(--orange);">${o.status || 'en_attente'}</span>
+          ${o.tx_hash ? `<span style="font-family:monospace;font-size:11px;color:var(--text-dim);">TX: ${o.tx_hash.slice(0,12)}...</span>` : ''}
+        </div>
+        ${o.notes ? `<div style="font-size:12px;color:var(--text-dim);margin-top:4px;">${o.notes}</div>` : ''}
+      </div>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+// ── Catalog ──
+
+async function loadCatalog() {
+  try {
+    const q = document.getElementById('catalogSearch').value;
+    const category = document.getElementById('catalogCategoryFilter').value;
+    let url = '/api/web3/exchange/catalog?';
+    if (q) url += 'q=' + encodeURIComponent(q) + '&';
+    if (category) url += 'category=' + category;
+    const data = await api(url);
+    const items = data.items || [];
+    document.getElementById('catalogCount').textContent = items.length;
+    const container = document.getElementById('catalogContainer');
+    if (!items.length) {
+      container.innerHTML = '<div class="empty">Catalogue vide</div>';
+      return;
+    }
+    container.innerHTML = '<div class="catalog-grid">' + items.map(item => {
+      const icons = { legume:'&#x1F955;', fruit:'&#x1F34E;', semence:'&#x1F331;', plante:'&#x1F33F;', outil:'&#x1F528;', service:'&#x1F4BC;' };
+      return `<div class="catalog-item">
+        <div class="icon">${icons[item.category] || '&#x1F4E6;'}</div>
+        <div class="name">${item.name}</div>
+        <div class="cat">${item.category}</div>
+        ${item.default_price_brt ? `<div class="price">${item.default_price_brt} BRT/${item.unit || 'kg'}</div>` : ''}
+        ${item.variety ? `<div class="price" style="font-size:11px;">${item.variety}</div>` : ''}
+      </div>`;
+    }).join('') + '</div>';
+  } catch(e) { console.error(e); }
+}
+
+async function addToCatalog() {
+  const name = document.getElementById('catName').value;
+  const category = document.getElementById('catCategory').value;
+  const unit = document.getElementById('catUnit').value;
+  const description = document.getElementById('catDesc').value;
+  const default_price_brt = parseFloat(document.getElementById('catPrice').value) || 0;
+  const variety = document.getElementById('catVariety').value;
+  if (!name) { toast('Nom requis', 'var(--red)'); return; }
+  const res = await api('/api/web3/exchange/catalog', { method:'POST', body:JSON.stringify({name, category, unit, description, default_price_brt, variety}) });
+  if (res.error) { toast(res.error, 'var(--red)'); return; }
+  hideModal('addCatalogModal');
+  toast('Ajouté au catalogue !');
+  loadCatalog();
+}
+
+// ── Init ──
+
+document.getElementById('searchInput').addEventListener('keyup', (e) => { if (e.key === 'Enter') loadListings(); });
+document.getElementById('catalogSearch').addEventListener('keyup', (e) => { if (e.key === 'Enter') loadCatalog(); });
+refreshAll();
+setInterval(() => { if (document.querySelector('.tab.active')?.textContent.trim() === 'Parcourir') loadListings(); }, 30000);
+</script>
+{% endblock %}

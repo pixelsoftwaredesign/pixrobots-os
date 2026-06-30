@@ -1,0 +1,21 @@
+[
+  {
+    "order_id": "DIST-EFB28919",
+    "batch_id": "BATCH-DEMO",
+    "product": "tomate_coeur_de_boeuf",
+    "quantity_kg": 10,
+    "destination": "Marche Central",
+    "client": "Marche Local",
+    "client_ref": "",
+    "status": "préparé",
+    "delivery_date": "2026-06-29",
+    "unit_price": 4.5,
+    "total_value": 45.0,
+    "shipping_cost": 0.0,
+    "payment_method": "facture",
+    "certifications": [],
+    "notes": "",
+    "created": "2026-06-29T04:09:27.260120",
+    "updated": "2026-06-29T04:09:27.260120"
+  }
+]

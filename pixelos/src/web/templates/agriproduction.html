@@ -1,0 +1,454 @@
+{% extends "base.html" %}
+{% block title %}AgriProduction - PixelOS{% endblock %}
+{% block content %}
+<style>
+.ag-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.ag-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 20px;
+}
+.ag-card .card-header { font-size: 13px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.ag-card .card-value { font-size: 32px; font-weight: 700; }
+.ag-card .card-value .unit { font-size: 16px; color: var(--text-dim); }
+.ag-card .card-sub { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+.zone-forecast-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.zone-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px;
+}
+.zone-card .z-name { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+.zone-card .z-stat { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
+.zone-card .z-stat .z-label { color: var(--text-dim); }
+.zone-card .z-stat .z-val { font-weight: 600; }
+.zone-card .z-lines { margin-top: 8px; font-size: 12px; color: var(--text-dim); }
+.confidence-bar {
+  height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; margin: 6px 0;
+}
+.confidence-bar .fill { height: 100%; border-radius: 3px; }
+.ag-table { width: 100%; font-size: 13px; border-collapse: collapse; }
+.ag-table th { text-align: left; padding: 8px 10px; color: var(--text-dim); border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+.ag-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.ag-table tr:hover td { background: rgba(255,255,255,0.02); }
+.status-badge {
+  display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 11px; font-weight: 600;
+}
+.status-badge.prepare { background: rgba(88,166,255,0.15); color: var(--blue); }
+.status-badge.charge { background: rgba(210,153,34,0.15); color: var(--orange); }
+.status-badge.transit { background: rgba(210,153,34,0.15); color: var(--orange); }
+.status-badge.livre { background: rgba(63,185,80,0.15); color: var(--green); }
+.status-badge.confirme { background: rgba(63,185,80,0.15); color: var(--green); }
+.status-badge.paid { background: rgba(63,185,80,0.15); color: var(--green); }
+.status-badge.unpaid { background: rgba(248,81,73,0.15); color: var(--red); }
+.calibre-badge {
+  display: inline-block; padding: 1px 8px; border-radius: 8px; font-size: 11px; font-weight: 600;
+}
+.calibre-badge.extra { background: rgba(63,185,80,0.15); color: var(--green); }
+.calibre-badge.I { background: rgba(88,166,255,0.15); color: var(--blue); }
+.calibre-badge.II { background: rgba(210,153,34,0.15); color: var(--orange); }
+.calibre-badge.III { background: rgba(248,81,73,0.15); color: var(--red); }
+.readiness-alert {
+  padding: 12px 16px; border-left: 3px solid var(--green);
+  background: var(--card); margin-bottom: 8px; border-radius: 0 6px 6px 0;
+}
+.readiness-alert .r-name { font-weight: 600; }
+.readiness-alert .r-desc { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+.ag-modal-overlay {
+  display: none; position: fixed; top:0; left:0; width:100%; height:100%;
+  background: rgba(0,0,0,0.6); z-index: 1000;
+}
+.ag-modal {
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 24px; max-width: 600px; margin: 80px auto;
+}
+.ag-modal h3 { margin-bottom: 16px; }
+.ag-modal .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.ag-modal label { font-size: 12px; color: var(--text-dim); display: block; margin-bottom: 4px; }
+.ag-modal input, .ag-modal select, .ag-modal textarea {
+  width: 100%; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); padding: 8px; border-radius: 6px; font-size: 13px;
+}
+.ag-modal textarea { min-height: 60px; }
+.ag-modal .btn-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+</style>
+
+<div class="stats-grid" id="kpiGrid"></div>
+
+<div class="toolbar" style="margin-bottom:12px">
+  <button class="btn-blue" onclick="loadAll()">Rafraichir</button>
+  <span style="font-size:13px;color:var(--text-dim)" id="lastRefresh"></span>
+  <span style="flex:1"></span>
+  <button class="btn-green" onclick="showSortModal()">Nouveau tri</button>
+  <button class="btn-blue" onclick="showOrderModal()">Nouvelle commande</button>
+  <button class="btn-orange" onclick="showDeliveryModal()">Bon de livraison</button>
+</div>
+
+<h3 class="section-title">Previsions par Zone</h3>
+<div id="forecastGrid" class="zone-forecast-grid" style="margin-bottom:24px"></div>
+
+<h3 class="section-title">Disponible a la Recolte</h3>
+<div id="readinessList" style="margin-bottom:24px"></div>
+
+<div class="ag-grid" style="margin-bottom:24px">
+  <div class="ag-card" style="grid-column:span 2">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span class="card-header">Tris & Calibrages</span>
+      <span style="font-size:12px;color:var(--text-dim)" id="sortingCount"></span>
+    </div>
+    <table class="ag-table">
+      <thead><tr><th>Tri</th><th>Lot</th><th>Date</th><th>Methode</th><th>Total kg</th><th>Commerc.</th><th>Rdt</th></tr></thead>
+      <tbody id="sortingsBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="ag-grid" style="margin-bottom:24px">
+  <div class="ag-card" style="grid-column:span 2">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span class="card-header">Commandes Distribution</span>
+      <span style="font-size:12px;color:var(--text-dim)" id="orderCount"></span>
+    </div>
+    <table class="ag-table">
+      <thead><tr><th>Commande</th><th>Client</th><th>Produit</th><th>kg</th><th>Total</th><th>Statut</th><th>Livraison</th><th>Action</th></tr></thead>
+      <tbody id="ordersBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="ag-grid" style="margin-bottom:24px">
+  <div class="ag-card" style="grid-column:span 2">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span class="card-header">Bons de Livraison</span>
+      <span style="font-size:12px;color:var(--text-dim)" id="deliveryCount"></span>
+    </div>
+    <table class="ag-table">
+      <thead><tr><th>Note</th><th>Client</th><th>Date</th><th>Total HT</th><th>TVA</th><th>Total TTC</th><th>Paye</th><th>Action</th></tr></thead>
+      <tbody id="deliveriesBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<h3 class="section-title">Journal des Ventes</h3>
+<div class="stats-grid" id="salesGrid" style="margin-bottom:24px"></div>
+
+<div class="ag-modal-overlay" id="sortModal">
+  <div class="ag-modal">
+    <h3>Nouveau Tri / Calibrage</h3>
+    <div class="form-row">
+      <div><label>Lot (batch_id)</label><input type="text" id="sortBatch" placeholder="BATCH-..."></div>
+      <div><label>Methode</label><select id="sortMethod"><option>manuel</option><option>optique</option><option>gravimetrique</option><option>tamis</option></select></div>
+    </div>
+    <div class="form-row">
+      <div><label>Poids (kg)</label><input type="number" id="sortWeight" step="0.1"></div>
+      <div><label>Calibre</label><select id="sortCalibre"><option>extra</option><option selected>I</option><option>II</option><option>III</option></select></div>
+    </div>
+    <div class="form-row">
+      <div><label>Defaut</label><select id="sortDefect"><option value="">Aucun</option><option>meurtri</option><option>pourri</option><option>deforme</option><option>tache</option><option>insecte</option><option>moisissure</option></select></div>
+      <div><label>Issue</label><select id="sortOutcome"><option>commercialisable</option><option>transformable</option><option>dechet</option></select></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-red" onclick="closeSortModal()">Annuler</button>
+      <button class="btn-green" onclick="createSorting()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div class="ag-modal-overlay" id="orderModal">
+  <div class="ag-modal">
+    <h3>Nouvelle Commande Distribution</h3>
+    <div class="form-row">
+      <div><label>Lot (batch_id)</label><input type="text" id="ordBatch" placeholder="BATCH-..."></div>
+      <div><label>Produit</label><input type="text" id="ordProduct" placeholder="tomate_coeur_de_boeuf"></div>
+    </div>
+    <div class="form-row">
+      <div><label>Quantite (kg)</label><input type="number" id="ordQty" step="0.1"></div>
+      <div><label>Prix/kg</label><input type="number" id="ordPrice" step="0.01"></div>
+    </div>
+    <div class="form-row">
+      <div><label>Client</label><input type="text" id="ordClient"></div>
+      <div><label>Destination</label><input type="text" id="ordDest"></div>
+    </div>
+    <div class="form-row">
+      <div><label>Ref client</label><input type="text" id="ordRef"></div>
+      <div><label>Certifications</label><select id="ordCerts"><option value="">Aucune</option><option>bio</option><option>label_rouge</option><option>AOP</option><option>commerce_equitable</option></select></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-red" onclick="closeOrderModal()">Annuler</button>
+      <button class="btn-green" onclick="createOrder()">Creer</button>
+    </div>
+  </div>
+</div>
+
+<div class="ag-modal-overlay" id="deliveryModal">
+  <div class="ag-modal">
+    <h3>Bon de Livraison</h3>
+    <div class="form-row">
+      <div><label>Commande (order_id)</label><input type="text" id="delOrderId" placeholder="DIST-..."></div>
+      <div><label>Client</label><input type="text" id="delClient" placeholder="(laissez pour reprendre de la commande)"></div>
+    </div>
+    <div class="form-row">
+      <div><label>Adresse</label><input type="text" id="delAddr"></div>
+      <div><label>TVA %</label><input type="number" id="delTva" value="5.5" step="0.1"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-red" onclick="closeDeliveryModal()">Annuler</button>
+      <button class="btn-green" onclick="createDelivery()">Generer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+async function loadAll() {
+  const [stats, forecast, readiness, sortings, orders, deliveries, sales] = await Promise.all([
+    fetch('/api/agriproduction/stats').then(r=>r.json()),
+    fetch('/api/agriproduction/forecast').then(r=>r.json()),
+    fetch('/api/agriproduction/readiness').then(r=>r.json()),
+    fetch('/api/agriproduction/sortings').then(r=>r.json()),
+    fetch('/api/agriproduction/orders').then(r=>r.json()),
+    fetch('/api/agriproduction/deliveries').then(r=>r.json()),
+    fetch('/api/agriproduction/sales').then(r=>r.json()),
+  ]);
+  renderKPIs(stats, forecast);
+  renderForecast(forecast);
+  renderReadiness(readiness);
+  renderSortings(sortings);
+  renderOrders(orders);
+  renderDeliveries(deliveries);
+  renderSales(sales);
+  document.getElementById('lastRefresh').textContent = new Date().toLocaleTimeString('fr-FR');
+}
+
+function renderKPIs(stats, forecast) {
+  const totalKg = forecast.total_predicted_kg || 0;
+  const totalVal = forecast.total_predicted_value || 0;
+  const avgConf = forecast.avg_confidence_pct || 0;
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="stat-card"><div class="label">Prevision totale</div><div class="value green">${totalKg.toFixed(1)}<span style="font-size:16px;color:var(--text-dim)"> kg</span></div><div class="card-sub">${forecast.zone_count || 0} zones</div></div>
+    <div class="stat-card"><div class="label">Valeur totale estimee</div><div class="value" style="color:var(--orange)">${totalVal.toFixed(2)}<span style="font-size:16px;color:var(--text-dim)"> EUR</span></div></div>
+    <div class="stat-card"><div class="label">Confiance moyenne</div><div class="value blue">${avgConf}<span style="font-size:16px;color:var(--text-dim)">%</span></div></div>
+    <div class="stat-card"><div class="label">Tris</div><div class="value blue">${stats.sortings || 0}</div></div>
+    <div class="stat-card"><div class="label">Commandes</div><div class="value green">${stats.orders || 0}</div></div>
+    <div class="stat-card"><div class="label">Livraisons</div><div class="value blue">${stats.delivery_notes || 0}</div></div>
+    <div class="stat-card"><div class="label">Ventes</div><div class="value" style="color:var(--orange)">${((stats.sales && stats.sales.total_ht) || 0).toFixed(2)}<span style="font-size:16px;color:var(--text-dim)"> EUR</span></div></div>
+    <div class="stat-card"><div class="label">Prix marche suivis</div><div class="value blue">${(stats.forecast && stats.forecast.market_prices) || 0}</div></div>
+  `;
+}
+
+function renderForecast(fc) {
+  const grid = document.getElementById('forecastGrid');
+  const zones = fc.zones || {};
+  const zoneIds = Object.keys(zones);
+  if (!zoneIds.length) {
+    grid.innerHTML = '<p style="color:var(--text-dim);grid-column:1/-1">Aucune prevision disponible</p>';
+    return;
+  }
+  grid.innerHTML = zoneIds.map(zid => {
+    const z = zones[zid];
+    const confColor = z.avg_confidence_pct > 70 ? 'var(--green)' : z.avg_confidence_pct > 40 ? 'var(--orange)' : 'var(--red)';
+    const harvestStr = (z.estimated_harvest_dates || []).join(', ');
+    return `<div class="zone-card">
+      <div class="z-name">${escHtml(zid)}</div>
+      <div class="z-stat"><span class="z-label">Estimation</span><span class="z-val">${z.predicted_total_kg.toFixed(1)} kg</span></div>
+      <div class="z-stat"><span class="z-label">Valeur</span><span class="z-val" style="color:var(--orange)">${z.predicted_total_value.toFixed(2)} EUR</span></div>
+      <div class="z-stat"><span class="z-label">Lignes</span><span class="z-val">${z.lines}</span></div>
+      <div style="margin-top:6px">
+        <div style="display:flex;justify-content:space-between;font-size:12px">
+          <span style="color:var(--text-dim)">Confiance</span>
+          <span style="font-weight:600;color:${confColor}">${z.avg_confidence_pct}%</span>
+        </div>
+        <div class="confidence-bar"><div class="fill" style="width:${z.avg_confidence_pct}%;background:${confColor}"></div></div>
+      </div>
+      ${harvestStr ? `<div class="z-lines">Dates recolte estimees: ${harvestStr}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderReadiness(list) {
+  const container = document.getElementById('readinessList');
+  if (!list || !list.length) {
+    container.innerHTML = '<p style="color:var(--text-dim)">Aucune ligne disponible pour la recolte</p>';
+    return;
+  }
+  container.innerHTML = list.map(r => {
+    const f = r.forecast || {};
+    return `<div class="readiness-alert">
+      <div class="r-name">${escHtml(r.message || r.line_id)}</div>
+      <div class="r-desc">
+        Produit: ${escHtml(r.product || '-')} |
+        Pieds: ${r.plant_count || '-'} |
+        Estime: ${f.kg ? f.kg.toFixed(1) + ' kg' : '-'} |
+        Valeur: ${f.value ? f.value.toFixed(2) + ' EUR' : '-'} |
+        Conf: ${f.confidence || '-'}%
+        ${r.zone_id ? ' | Zone: ' + escHtml(r.zone_id) : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderSortings(sortings) {
+  const tbody = document.getElementById('sortingsBody');
+  document.getElementById('sortingCount').textContent = sortings.length + ' tris';
+  if (!sortings.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-dim);text-align:center">Aucun tri</td></tr>';
+    return;
+  }
+  tbody.innerHTML = sortings.slice(0, 20).map(s => {
+    const cal = s.by_calibre || {};
+    const calStr = Object.entries(cal).map(([k,v]) => `<span class="calibre-badge ${k}">${k}: ${v.toFixed(1)}kg</span>`).join(' ');
+    return `<tr>
+      <td style="font-size:11px;font-family:monospace">${s.sorting_id}</td>
+      <td style="font-size:11px;font-family:monospace">${s.batch_id}</td>
+      <td>${s.date}</td>
+      <td>${s.method}</td>
+      <td>${s.total_kg.toFixed(1)}</td>
+      <td>${s.commercialisable_pct.toFixed(1)}%</td>
+      <td>${s.yield_pct.toFixed(1)}%</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderOrders(orders) {
+  const tbody = document.getElementById('ordersBody');
+  document.getElementById('orderCount').textContent = orders.length + ' commandes';
+  if (!orders.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-dim);text-align:center">Aucune commande</td></tr>';
+    return;
+  }
+  tbody.innerHTML = orders.slice(0, 20).map(o => {
+    const statusClass = (o.status || '').replace('é', 'e').replace('è', 'e');
+    const nextStatus = statusClass === 'prepare' ? 'charge' : statusClass === 'charge' ? 'en_transit' : statusClass === 'en_transit' ? 'livre' : statusClass === 'livre' ? 'confirme' : null;
+    const statusLabel = o.status;
+    return `<tr>
+      <td style="font-size:11px;font-family:monospace">${o.order_id}</td>
+      <td>${escHtml(o.client || '-')}</td>
+      <td>${escHtml(o.product || '-')}</td>
+      <td>${o.quantity_kg.toFixed(1)}</td>
+      <td>${o.total_value.toFixed(2)} EUR</td>
+      <td><span class="status-badge ${statusClass}">${escHtml(statusLabel)}</span></td>
+      <td>${o.delivery_date || '-'}</td>
+      <td>${nextStatus ? `<button class="btn-blue" style="padding:2px 8px;font-size:11px" onclick="updateOrder('${o.order_id}','${nextStatus}')">${nextStatus == 'en_transit' ? 'Transit' : nextStatus}</button>` : '<span style="color:var(--text-dim);font-size:11px">-</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderDeliveries(deliveries) {
+  const tbody = document.getElementById('deliveriesBody');
+  document.getElementById('deliveryCount').textContent = deliveries.length + ' bons';
+  if (!deliveries.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-dim);text-align:center">Aucun bon de livraison</td></tr>';
+    return;
+  }
+  tbody.innerHTML = deliveries.slice(0, 20).map(d => {
+    const paidLabel = d.paid ? 'Paye' : 'Impaye';
+    const paidClass = d.paid ? 'paid' : 'unpaid';
+    return `<tr>
+      <td style="font-size:11px;font-family:monospace">${d.note_id}</td>
+      <td>${escHtml(d.client || '-')}</td>
+      <td>${d.date}</td>
+      <td>${d.total_ht.toFixed(2)} EUR</td>
+      <td>${d.tva_pct.toFixed(1)}%</td>
+      <td>${d.total_ttc.toFixed(2)} EUR</td>
+      <td><span class="status-badge ${paidClass}">${paidLabel}</span></td>
+      <td>${!d.paid ? `<button class="btn-green" style="padding:2px 8px;font-size:11px" onclick="markPaid('${d.note_id}')">Payer</button>` : `<span style="color:var(--text-dim);font-size:11px">${d.paid_date || ''}</span>`}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderSales(sales) {
+  document.getElementById('salesGrid').innerHTML = `
+    <div class="stat-card"><div class="label">Ventes enregistrees</div><div class="value blue">${sales.total_entries || 0}</div></div>
+    <div class="stat-card"><div class="label">Total HT</div><div class="value green">${(sales.total_ht || 0).toFixed(2)}<span style="font-size:16px;color:var(--text-dim)"> EUR</span></div></div>
+    <div class="stat-card"><div class="label">Total paye</div><div class="value" style="color:var(--orange)">${(sales.total_paid || 0).toFixed(2)}<span style="font-size:16px;color:var(--text-dim)"> EUR</span></div></div>
+    <div class="stat-card"><div class="label">Impayes</div><div class="value red">${(sales.total_outstanding || 0).toFixed(2)}<span style="font-size:16px;color:var(--text-dim)"> EUR</span></div></div>
+  `;
+}
+
+async function updateOrder(orderId, status) {
+  const label = status === 'en_transit' ? 'en_transit' : status;
+  await fetch('/api/agriproduction/orders/' + orderId, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({status: label})
+  });
+  loadAll();
+}
+
+async function markPaid(noteId) {
+  await fetch('/api/agriproduction/deliveries/' + noteId + '/pay', {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({})
+  });
+  loadAll();
+}
+
+// Modals
+function showSortModal() { document.getElementById('sortModal').style.display = 'block'; }
+function closeSortModal() { document.getElementById('sortModal').style.display = 'none'; }
+function showOrderModal() { document.getElementById('orderModal').style.display = 'block'; }
+function closeOrderModal() { document.getElementById('orderModal').style.display = 'none'; }
+function showDeliveryModal() { document.getElementById('deliveryModal').style.display = 'block'; }
+function closeDeliveryModal() { document.getElementById('deliveryModal').style.display = 'none'; }
+
+async function createSorting() {
+  const data = {
+    batch_id: document.getElementById('sortBatch').value,
+    method: document.getElementById('sortMethod').value,
+    entries: [{
+      weight_kg: parseFloat(document.getElementById('sortWeight').value) || 1.0,
+      calibre: document.getElementById('sortCalibre').value,
+      defect: document.getElementById('sortDefect').value,
+      outcome: document.getElementById('sortOutcome').value,
+    }]
+  };
+  const r = await fetch('/api/agriproduction/sort', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  });
+  if (r.ok) { closeSortModal(); loadAll(); }
+  else { const e = await r.json(); alert(e.error || 'Erreur'); }
+}
+
+async function createOrder() {
+  const certVal = document.getElementById('ordCerts').value;
+  const data = {
+    batch_id: document.getElementById('ordBatch').value,
+    product: document.getElementById('ordProduct').value,
+    quantity_kg: parseFloat(document.getElementById('ordQty').value) || 1.0,
+    client: document.getElementById('ordClient').value,
+    destination: document.getElementById('ordDest').value,
+    client_ref: document.getElementById('ordRef').value,
+    unit_price: parseFloat(document.getElementById('ordPrice').value) || null,
+    certifications: certVal ? [certVal] : [],
+  };
+  const r = await fetch('/api/agriproduction/order', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  });
+  if (r.ok) { closeOrderModal(); loadAll(); }
+  else { const e = await r.json(); alert(e.error || 'Erreur'); }
+}
+
+async function createDelivery() {
+  const data = {
+    order_id: document.getElementById('delOrderId').value,
+    client: document.getElementById('delClient').value || undefined,
+    client_address: document.getElementById('delAddr').value || undefined,
+    tva_pct: parseFloat(document.getElementById('delTva').value) || 5.5,
+  };
+  const r = await fetch('/api/agriproduction/delivery', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  });
+  if (r.ok) { closeDeliveryModal(); loadAll(); }
+  else { const e = await r.json(); alert(e.error || 'Erreur'); }
+}
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+loadAll();
+setInterval(loadAll, 20000);
+</script>
+{% endblock %}

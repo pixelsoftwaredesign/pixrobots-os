@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}Charte de Souveraineté{% endblock %}
+{% block content %}
+<style>
+.charter-container { max-width: 800px; margin: 0 auto; }
+.charter-header { text-align: center; margin-bottom: 32px; padding: 32px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+.charter-header h1 { font-size: 24px; color: var(--green); margin-bottom: 8px; }
+.charter-header p { color: var(--text-dim); font-size: 14px; }
+.charter-header .seal { font-size: 48px; margin-bottom: 12px; }
+.charter-content { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 32px; white-space: pre-wrap; font-size: 14px; line-height: 1.7; font-family: 'Courier New', monospace; color: var(--text); }
+.charter-actions { margin-top: 24px; text-align: center; padding: 24px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+.charter-actions .status { margin-bottom: 12px; font-size: 14px; }
+.charter-actions .status.accepted { color: var(--green); }
+.charter-actions .status.pending { color: var(--orange); }
+.charter-tabs { display: flex; gap: 0; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+.charter-tab { padding: 10px 20px; cursor: pointer; font-size: 14px; color: var(--text-dim); border-bottom: 2px solid transparent; transition: 0.15s; }
+.charter-tab.active { color: var(--text); border-bottom-color: var(--green); }
+.charter-tab:hover { color: var(--text); }
+.panel { display: none; }
+.panel.active { display: block; }
+input { width: 100%; padding: 10px 12px; margin-bottom: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 14px; }
+label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.row { display: flex; gap: 12px; }
+.row > * { flex: 1; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+.card h3 { font-size: 14px; color: var(--text-dim); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+.disclaimer-box { background: rgba(210,153,34,0.08); border: 1px solid rgba(210,153,34,0.3); border-radius: 8px; padding: 16px; font-size: 13px; margin-bottom: 16px; }
+.disclaimer-box strong { color: var(--orange); }
+.toast { position: fixed; bottom: 24px; right: 24px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 20px; font-size: 14px; z-index: 200; animation: fadeIn 0.3s; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+
+<div class="charter-container">
+  <div class="charter-header">
+    <div class="seal">&#x1F6E1;&#xFE0F;</div>
+    <h1>Charte de Souveraineté PixelOS</h1>
+    <p>Liberté &amp; Responsabilité — Souveraineté Numérique</p>
+  </div>
+
+  <div class="charter-tabs">
+    <div class="charter-tab active" onclick="switchTab('text',this)">Charte</div>
+    <div class="charter-tab" onclick="switchTab('ddns',this)">Sous-domaines</div>
+    <div class="charter-tab" onclick="switchTab('status',this)">Statut</div>
+  </div>
+
+  <div id="panel-text" class="panel active">
+    <div class="charter-content" id="charterText">Chargement...</div>
+    <div class="charter-actions">
+      <div class="status pending" id="charterStatusDisplay">Statut : Non acceptée</div>
+      <button class="btn-green" id="acceptBtn" onclick="acceptCharter()">&#x1F4DC; Accepter la Charte</button>
+      <p style="font-size:12px;color:var(--text-dim);margin-top:8px;">
+        En acceptant, vous confirmez être seul responsable de votre nœud.
+      </p>
+    </div>
+  </div>
+
+  <div id="panel-ddns" class="panel">
+    <div class="disclaimer-box">
+      <strong>&#x26A0;&#xFE0F; Avis de Non-Responsabilité</strong><br>
+      Ce sous-domaine est fourni à titre d'outil technique. L'utilisateur
+      est seul responsable des contenus hébergés. Pour une souveraineté
+      totale, acquérez un nom de domaine personnel.
+    </div>
+    <div class="card">
+      <h3>Obtenir un sous-domaine gratuit</h3>
+      <label>Sous-domaine</label>
+      <div class="row">
+        <input id="ddnsSubdomain" placeholder="ma-ferme" style="margin-bottom:0;">
+        <span style="padding:10px 0;color:var(--text-dim);font-size:14px;">.pixelos.org</span>
+      </div>
+      <small style="color:var(--text-dim);display:block;margin-bottom:12px;">
+        Ex: ma-ferme.pixelos.org
+      </small>
+      <div class="row">
+        <button class="btn-green" onclick="registerDDNS()">Enregistrer</button>
+        <button class="btn-blue" onclick="refreshDDNS()">Rafraîchir IP</button>
+      </div>
+    </div>
+    <div id="ddnsList"></div>
+  </div>
+
+  <div id="panel-status" class="panel">
+    <div class="card">
+      <h3>Statut de la Charte</h3>
+      <div id="charterStatusDetail"></div>
+    </div>
+    <div class="card">
+      <h3>Sous-domaines enregistrés</h3>
+      <div id="ddnsStatusDetail"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" style="display:none;"></div>
+
+<script>
+async function api(url, opts={}) {
+  const r = await fetch(url, { headers:{'Content-Type':'application/json'}, ...opts });
+  return r.json();
+}
+function toast(msg, color='var(--green)') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.borderLeft = '3px solid ' + color; t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3000);
+}
+function switchTab(name, el) {
+  document.querySelectorAll('.charter-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+  if (name === 'ddns') loadDDNS();
+  if (name === 'status') loadStatus();
+}
+
+async function loadCharter() {
+  const data = await api('/api/sovereignty/charter');
+  document.getElementById('charterText').textContent = data.text || 'Erreur de chargement';
+  updateStatus(data.status);
+}
+
+function updateStatus(status) {
+  const display = document.getElementById('charterStatusDisplay');
+  const btn = document.getElementById('acceptBtn');
+  if (status && status.accepted) {
+    display.className = 'status accepted';
+    display.innerHTML = '&#x2705; Acceptée le ' + (status.accepted_at || '').slice(0,10);
+    btn.style.display = 'none';
+  } else {
+    display.className = 'status pending';
+    display.innerHTML = '&#x23F3; En attente d\'acceptation';
+    btn.style.display = 'inline-block';
+  }
+}
+
+async function acceptCharter() {
+  const data = await api('/api/sovereignty/charter/accept', { method:'POST', body:'{}' });
+  if (data.accepted) {
+    toast('Charte acceptée !');
+    updateStatus(data);
+  }
+}
+
+async function registerDDNS() {
+  const subdomain = document.getElementById('ddnsSubdomain').value.trim();
+  if (!subdomain) { toast('Nom de sous-domaine requis', 'var(--red)'); return; }
+  const status = await api('/api/sovereignty/charter/status');
+  if (!status.accepted) { toast('Vous devez d\'abord accepter la Charte', 'var(--red)'); return; }
+  const data = await api('/api/sovereignty/ddns/register', {
+    method:'POST',
+    body:JSON.stringify({subdomain, disclaimer_accepted: true})
+  });
+  if (data.error) { toast(data.error, 'var(--red)'); return; }
+  toast('Sous-domaine ' + data.subdomain + ' enregistré !');
+  loadDDNS();
+}
+
+async function refreshDDNS() {
+  const list = await api('/api/sovereignty/ddns/list');
+  const regs = list.registrations || [];
+  for (const r of regs) {
+    await api('/api/sovereignty/ddns/update', { method:'POST', body:JSON.stringify({subdomain: r.subdomain.replace('.pixelos.org','')}) });
+  }
+  toast('IP mise à jour');
+  loadDDNS();
+}
+
+async function loadDDNS() {
+  const data = await api('/api/sovereignty/ddns/list');
+  const list = data.registrations || [];
+  const container = document.getElementById('ddnsList');
+  if (!list.length) {
+    container.innerHTML = '<div style="color:var(--text-dim);text-align:center;padding:20px;">Aucun sous-domaine enregistré</div>';
+    return;
+  }
+  container.innerHTML = '<h3 style="margin:16px 0 8px;">Vos sous-domaines</h3>' +
+    list.map(r => `<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;display:flex;justify-content:space-between;">
+      <span><strong>${r.subdomain}</strong> → ${r.ip}</span>
+      <span style="color:var(--text-dim);font-size:12px;">${r.active ? '<span class="badge ok">Actif</span>' : '<span class="badge" style="background:rgba(139,148,158,0.15);color:var(--text-dim);">Inactif</span>'}</span>
+    </div>`).join('');
+}
+
+async function loadStatus() {
+  const [charterStatus, ddnsList] = await Promise.all([
+    api('/api/sovereignty/charter/status'),
+    api('/api/sovereignty/ddns/list'),
+  ]);
+  document.getElementById('charterStatusDetail').innerHTML = `
+    <p>Acceptée : ${charterStatus.accepted ? '&#x2705; Oui' : '&#x274C; Non'}</p>
+    <p>Date : ${charterStatus.accepted_at ? new Date(charterStatus.accepted_at).toLocaleString() : '—'}</p>
+    <p>ID Nœud : ${charterStatus.node_id || '—'}</p>
+  `;
+  const regs = ddnsList.registrations || [];
+  document.getElementById('ddnsStatusDetail').innerHTML = regs.length
+    ? regs.map(r => `<p>${r.subdomain} → ${r.ip} ${r.active ? '(actif)' : '(inactif)'}</p>`).join('')
+    : '<p>Aucun sous-domaine enregistré</p>';
+}
+
+loadCharter();
+</script>
+{% endblock %}
