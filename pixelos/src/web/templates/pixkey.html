@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}PixKey — Authentification{% endblock %}
+{% block head %}
+<style>
+.key-card { background:#16213e; border-radius:12px; padding:16px; margin:8px 0; }
+.key-card small { color:#888; }
+.badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; background:#0f3460; }
+.badge.ok { background:#00d2ff; color:#000; }
+.badge.nok { background:#533; color:#e94560; }
+</style>
+{% endblock %}
+{% block content %}
+<h1><span style="color:#e94560;">PixKey</span> <small style="font-size:16px;color:#888;">Authentification Physique & HSM</small></h1>
+<p>YubiKey · Clé de récupération · Tokens · Signature de transactions</p>
+
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;">
+  <button class="btn" onclick="authYubikey()">🔑 Auth YubiKey</button>
+  <button class="btn" onclick="showRecoveryForm()">🔐 Clé de récupération</button>
+  <button class="btn" onclick="authToken()">🎫 Token</button>
+  <button class="btn" onclick="showRegister()">➕ Enregistrer une clé</button>
+  <button class="btn" onclick="logout()">🚪 Déconnexion</button>
+</div>
+
+<div id="auth-result" style="margin:8px 0;"></div>
+
+<div id="recovery-form" style="display:none;" class="card">
+  <h3>🔐 Récupération</h3>
+  <input type="password" id="recovery-pwd" placeholder="Mot de passe maître" style="width:100%;padding:8px;margin:4px 0;border-radius:4px;background:#16213e;border:1px solid #0f3460;">
+  <input type="text" id="recovery-key-id" placeholder="Key ID (optionnel)" style="width:100%;padding:8px;margin:4px 0;border-radius:4px;background:#16213e;border:1px solid #0f3460;">
+  <button class="btn" onclick="doRecoveryAuth()">🔓 Authentifier</button>
+</div>
+
+<div id="register-form" style="display:none;" class="card">
+  <h3>➕ Enregistrer une clé</h3>
+  <select id="register-type" onchange="toggleRegisterFields()" style="width:100%;padding:8px;background:#16213e;border:1px solid #0f3460;border-radius:4px;">
+    <option value="yubikey">YubiKey</option>
+    <option value="recovery">Clé de récupération</option>
+    <option value="token">Token</option>
+  </select>
+  <input type="text" id="register-label" placeholder="Label" style="width:100%;padding:8px;margin:4px 0;border-radius:4px;background:#16213e;border:1px solid #0f3460;">
+  <div id="register-yubikey"><input type="text" id="register-serial" placeholder="Serial (laisser vide pour auto)" style="width:100%;padding:8px;margin:4px 0;border-radius:4px;background:#16213e;border:1px solid #0f3460;"></div>
+  <div id="register-recovery" style="display:none;"><input type="password" id="register-password" placeholder="Mot de passe maître" style="width:100%;padding:8px;margin:4px 0;border-radius:4px;background:#16213e;border:1px solid #0f3460;"></div>
+  <div id="register-token" style="display:none;"><input type="text" id="register-token-id" placeholder="Token ID" style="width:100%;padding:8px;margin:4px 0;border-radius:4px;background:#16213e;border:1px solid #0f3460;"></div>
+  <button class="btn" onclick="doRegister()">✅ Enregistrer</button>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+  <div class="card"><h3>🔑 Clés enregistrées</h3><div id="key-list"></div></div>
+  <div class="card"><h3>📊 Statut</h3><div id="key-stats"></div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function authYubikey() {
+  const r = await fetch("/api/pixkey/authenticate", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({method:"yubikey"}),
+  });
+  showResult(await r.json());
+}
+
+function showRecoveryForm() { document.getElementById("recovery-form").style.display = "block"; }
+
+async function doRecoveryAuth() {
+  const r = await fetch("/api/pixkey/authenticate", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({
+      method:"recovery",
+      password: document.getElementById("recovery-pwd").value,
+      key_id: document.getElementById("recovery-key-id").value,
+    }),
+  });
+  showResult(await r.json());
+}
+
+async function authToken() {
+  const token = prompt("Entrez le token:");
+  if (!token) return;
+  const r = await fetch("/api/pixkey/authenticate", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({method:"token", token}),
+  });
+  showResult(await r.json());
+}
+
+async function logout() {
+  const r = await fetch("/api/pixkey/logout", {method:"POST"});
+  showResult(await r.json());
+  loadKeyList();
+  loadStats();
+}
+
+function showRegister() { document.getElementById("register-form").style.display = "block"; }
+
+function toggleRegisterFields() {
+  const t = document.getElementById("register-type").value;
+  ["register-yubikey","register-recovery","register-token"].forEach(id => document.getElementById(id).style.display = id.includes(t) ? "block" : "none");
+}
+
+async function doRegister() {
+  const type = document.getElementById("register-type").value;
+  const label = document.getElementById("register-label").value;
+  let body = {};
+  if (type === "yubikey") body = {serial: document.getElementById("register-serial").value, label};
+  else if (type === "recovery") body = {password: document.getElementById("register-password").value, label};
+  else body = {token_id: document.getElementById("register-token-id").value, label};
+  const r = await fetch(`/api/pixkey/register/${type}`, {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(body),
+  });
+  showResult(await r.json());
+  loadKeyList();
+}
+
+function showResult(data) {
+  document.getElementById("auth-result").innerHTML = `<pre class="key-box">${JSON.stringify(data, null, 2)}</pre>`;
+}
+
+async function loadKeyList() {
+  const r = await fetch("/api/pixkey/keys");
+  const k = await r.json();
+  let html = '';
+  for (const [cat, items] of Object.entries(k)) {
+    if (items.length === 0) continue;
+    html += `<h4 style="margin:8px 0 4px;color:#888;">${cat}</h4>`;
+    html += items.map(i => `<div class="key-card">${i.label || i.id} <small>${i.id}</small> <span class="badge">${i.registered_at || i.created_at || ''}</span></div>`).join('');
+  }
+  document.getElementById("key-list").innerHTML = html || '<p style="color:#888;">Aucune clé enregistrée.</p>';
+}
+
+async function loadStats() {
+  const r = await fetch("/api/pixkey/stats");
+  const s = await r.json();
+  document.getElementById("key-stats").innerHTML = Object.entries(s).map(([k,v]) =>
+    `<div class="stat-card"><div class="stat-value">${typeof v === 'boolean' ? (v?'✅':'❌') : v}</div><div>${k}</div></div>`
+  ).join('');
+}
+
+document.addEventListener("DOMContentLoaded", () => { loadKeyList(); loadStats(); });
+</script>
+{% endblock %}

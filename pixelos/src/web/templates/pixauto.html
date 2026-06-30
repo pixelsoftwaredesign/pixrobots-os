@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}PixAuto — Automatisation{% endblock %}
+{% block head %}
+<style>
+.cmd-row { display:flex; gap:8px; margin:8px 0; }
+.cmd-row input { flex:1; }
+.recipe-card { background:#16213e; border-radius:12px; padding:16px; margin:8px 0; border-left:3px solid #e94560; }
+.recipe-card .step { background:#0a0a1a; padding:6px 10px; margin:4px 0; border-radius:4px; font-size:12px; }
+.recipe-card .step .ok { color:#4caf50; }
+.recipe-card .step .err { color:#e94560; }
+.log-line { font-size:11px; padding:1px 0; color:#888; font-family:monospace; }
+.log-line.info { color:#00d2ff; }
+.log-line.ok { color:#4caf50; }
+.log-line.err { color:#e94560; }
+</style>
+{% endblock %}
+{% block content %}
+<h1><span style="color:#e94560;">PixAuto</span> <small style="font-size:16px;color:#888;">Automatisation Intelligence Artificielle</small></h1>
+<p>Automatisation en langage naturel + compilation Solidity + exécution GPIO/MQTT.</p>
+
+<div class="card">
+  <h3>💬 Commande en langage naturel</h3>
+  <div class="cmd-row">
+    <input type="text" id="nl-input" placeholder='Ex: "allume la pompe si humidité < 30% pendant plus de 10 minutes"' style="flex:1;padding:10px;border-radius:6px;background:#16213e;color:#e0e0e0;border:1px solid #0f3460;">
+    <button class="btn" onclick="executeNL()">⚡ Exécuter</button>
+  </div>
+  <div id="nl-result"></div>
+</div>
+
+<div class="card">
+  <h3>📜 Recettes enregistrées</h3>
+  <div id="recipe-list"></div>
+</div>
+
+<div class="card">
+  <h3>📋 Logs d'exécution</h3>
+  <div id="exec-logs" style="max-height:300px;overflow:auto;background:#0a0a1a;padding:8px;border-radius:6px;"></div>
+</div>
+
+<div class="card">
+  <h3>📊 Statistiques</h3>
+  <div id="pixauto-stats"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function executeNL() {
+  const nl = document.getElementById("nl-input").value.trim();
+  if (!nl) return;
+  const r = await fetch("/api/pixauto/execute-nl", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({nl}),
+  });
+  const data = await r.json();
+  document.getElementById("nl-result").innerHTML = `<pre style="background:#0a0a1a;padding:10px;border-radius:6px;font-size:12px;">${JSON.stringify(data, null, 2)}</pre>`;
+  loadRecipes();
+  loadLogs();
+}
+
+async function loadRecipes() {
+  const r = await fetch("/api/pixauto/recipes");
+  const recipes = await r.json();
+  document.getElementById("recipe-list").innerHTML = recipes.length === 0
+    ? '<p style="color:#888;">Aucune recette enregistrée.</p>'
+    : recipes.map(rc => `
+      <div class="recipe-card">
+        <div><strong>${rc.name}</strong> <span style="color:#888;font-size:12px;">${rc.nl}</span></div>
+        <div style="margin-top:6px;">
+          ${(rc.compiled || []).map((s, i) => `<div class="step">${i+1}. ${s.action || s} ${s.status === 'ok' ? '<span class="ok">✅</span>' : s.status === 'error' ? '<span class="err">❌</span>' : ''}</div>`).join('')}
+        </div>
+        <button class="btn" style="padding:4px 10px;font-size:12px;margin-top:4px;" onclick="executeRecipe('${rc.name}')">▶️ Exécuter</button>
+      </div>
+    `).join('');
+}
+
+async function executeRecipe(name) {
+  const r = await fetch("/api/pixauto/execute", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({name}),
+  });
+  const data = await r.json();
+  alert(JSON.stringify(data));
+  loadLogs();
+}
+
+async function loadLogs() {
+  const r = await fetch("/api/pixauto/logs?limit=50");
+  const logs = await r.json();
+  document.getElementById("exec-logs").innerHTML = (logs || []).map(l =>
+    `<div class="log-line ${l.level || 'info'}">[${(l.ts || '').slice(11,19)}] ${l.msg || l}</div>`
+  ).join('') || '<div style="color:#888;">Aucun log.</div>';
+}
+
+async function loadStats() {
+  const r = await fetch("/api/pixauto/stats");
+  const s = await r.json();
+  document.getElementById("pixauto-stats").innerHTML = Object.entries(s).map(([k,v]) =>
+    `<div class="stat-card"><div class="stat-value">${v}</div><div>${k}</div></div>`
+  ).join('');
+}
+
+document.addEventListener("DOMContentLoaded", () => { loadRecipes(); loadLogs(); loadStats(); });
+</script>
+{% endblock %}

@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Digital Twin — Jumeau Numérique{% endblock %}
+{% block head %}
+<style>
+.twin-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
+.twin-card { background:#16213e; border-radius:12px; padding:16px; border-left:4px solid #0f3460; }
+.twin-card.healthy { border-left-color:#4caf50; }
+.twin-card.degraded { border-left-color:#ff9800; }
+.twin-card.stale { border-left-color:#e94560; }
+.sensor-row { display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #1a1a2e; font-size:13px; }
+.history-item { font-size:11px; padding:2px 0; color:#888; border-bottom:1px solid #1a1a2e; }
+</style>
+{% endblock %}
+{% block content %}
+<h1><span style="color:#00d2ff;">Digital Twin</span> <small style="font-size:16px;color:#888;">Jumeau Numérique Temps Réel</small></h1>
+<p>Miroir logiciel des équipements et cultures. Simulation · Alertes · Historique.</p>
+
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;">
+  <button class="btn" onclick="showCreateForm()">➕ Créer un jumeau</button>
+  <button class="btn" onclick="loadTwins()">🔄 Rafraîchir</button>
+</div>
+
+<div id="create-form" style="display:none;" class="card">
+  <h3>➕ Nouveau jumeau</h3>
+  <input type="text" id="twin-name" placeholder="Nom (ex: Pompe_Serre_Ouest)" style="width:100%;padding:8px;margin:4px 0;border-radius:4px;background:#16213e;border:1px solid #0f3460;">
+  <select id="twin-type" style="width:100%;padding:8px;margin:4px 0;background:#16213e;border:1px solid #0f3460;border-radius:4px;">
+    <option value="equipment">Équipement</option>
+    <option value="culture">Culture</option>
+    <option value="space">Espace</option>
+    <option value="sensor">Capteur</option>
+  </select>
+  <button class="btn" onclick="createTwin()">✅ Créer</button>
+</div>
+
+<div class="twin-grid" id="twin-grid"></div>
+
+<div class="card"><h3>📊 Statistiques</h3><div id="twin-stats"></div></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showCreateForm() { document.getElementById("create-form").style.display = "block"; }
+
+async function createTwin() {
+  const r = await fetch("/api/twin/create", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({
+      name: document.getElementById("twin-name").value,
+      type: document.getElementById("twin-type").value,
+    }),
+  });
+  const data = await r.json();
+  alert(data.status);
+  loadTwins();
+}
+
+async function loadTwins() {
+  const r = await fetch("/api/twin/list");
+  const twins = await r.json();
+  const grid = document.getElementById("twin-grid");
+  const entries = Object.values(twins);
+  if (entries.length === 0) {
+    grid.innerHTML = '<p style="color:#888;grid-column:1/-1;">Aucun jumeau. Créez-en un.</p>';
+  } else {
+    grid.innerHTML = entries.map(t => `
+      <div class="twin-card" id="twin-${t.id}">
+        <div style="display:flex;justify-content:space-between;">
+          <strong>${t.name}</strong> <span style="font-size:11px;color:#888;">${t.type}</span>
+        </div>
+        <div style="font-size:11px;color:#888;">${t.sensors_count} capteurs · Dernière sync: ${(t.last_sync||'').slice(0,19)}</div>
+        ${t.alerts_count > 0 ? `<div style="color:#e94560;font-size:12px;">🚨 ${t.alerts_count} alertes</div>` : ''}
+        <div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap;">
+          <button class="btn" style="padding:3px 8px;font-size:11px;" onclick="loadTwinDetail('${t.id}')">Détail</button>
+          <button class="btn" style="padding:3px 8px;font-size:11px;" onclick="simulateTwin('${t.id}')">Simuler</button>
+          <button class="btn" style="padding:3px 8px;font-size:11px;" onclick="checkHealth('${t.id}')">Santé</button>
+        </div>
+        <div id="detail-${t.id}" style="margin-top:4px;"></div>
+      </div>
+    `).join('');
+  }
+  loadStats();
+}
+
+async function loadTwinDetail(id) {
+  const r = await fetch(`/api/twin/${id}`);
+  const t = await r.json();
+  const div = document.getElementById("detail-"+id);
+  div.innerHTML = `
+    <div style="background:#0a0a1a;padding:8px;border-radius:6px;margin-top:4px;font-size:12px;">
+      <strong>Capteurs:</strong>
+      ${Object.entries(t.sensors||{}).map(([k,v]) => `<div class="sensor-row"><span>${k}</span><span>${v.value} ${v.unit || ''}</span></div>`).join('') || 'Aucun'}
+      <strong style="display:block;margin-top:4px;">État:</strong>
+      <div style="max-height:100px;overflow:auto;">
+        ${Object.entries(t.state||{}).map(([k,v]) => `<div class="sensor-row"><span>${k}</span><span>${v}</span></div>`).join('') || 'Aucun'}
+      </div>
+      <button class="btn" style="padding:3px 8px;font-size:11px;margin-top:4px;" onclick="showHistory('${id}')">📜 Historique</button>
+      <div id="history-${id}"></div>
+    </div>
+  `;
+}
+
+async function showHistory(id) {
+  const r = await fetch(`/api/twin/${id}/history?limit=20`);
+  const hist = await r.json();
+  document.getElementById("history-"+id).innerHTML = hist.map(h =>
+    `<div class="history-item">${(h.ts||'').slice(0,19)} · ${h.type} · ${h.sensor_id||h.actuator_id||''} = ${h.value||h.state||''}</div>`
+  ).join('') || 'Aucun historique';
+}
+
+async function simulateTwin(id) {
+  const scenario = prompt("Scénario (normal/heatwave/frost/optimal):", "normal");
+  if (!scenario) return;
+  const r = await fetch(`/api/twin/${id}/simulate`, {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({scenario}),
+  });
+  const data = await r.json();
+  alert("Simulation: " + JSON.stringify(data.result));
+  loadTwinDetail(id);
+}
+
+async function checkHealth(id) {
+  const r = await fetch(`/api/twin/${id}/health`);
+  const h = await r.json();
+  alert("Santé: " + h.health + " · Dérive: " + h.drift_hours + "h");
+}
+
+async function loadStats() {
+  const r = await fetch("/api/twin/stats");
+  const s = await r.json();
+  document.getElementById("twin-stats").innerHTML = Object.entries(s).map(([k,v]) =>
+    `<div class="stat-card"><div class="stat-value">${v}</div><div>${k}</div></div>`
+  ).join('');
+}
+
+document.addEventListener("DOMContentLoaded", loadTwins);
+</script>
+{% endblock %}

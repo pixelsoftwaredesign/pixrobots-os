@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}PixHAL — Hardware Abstraction Layer{% endblock %}
+{% block head %}
+<style>
+.hal-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media(max-width:768px){ .hal-grid { grid-template-columns:1fr; } }
+.device-card { background:#16213e; border-radius:12px; padding:16px; margin:8px 0; border-left:3px solid #0f3460; }
+.device-card.sensor { border-left-color:#00d2ff; }
+.device-card.actuator { border-left-color:#e94560; }
+.device-card .pin { display:inline-block; background:#0a0a1a; padding:2px 8px; border-radius:4px; font-size:11px; margin-right:4px; }
+.sysinfo { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; }
+.sysinfo .item { background:#1a1a2e; padding:8px 12px; border-radius:6px; }
+.sysinfo .item label { color:#888; font-size:11px; display:block; }
+</style>
+{% endblock %}
+{% block content %}
+<h1><span style="color:#00d2ff;">PixHAL</span> <small style="font-size:16px;color:#888;">Hardware Abstraction Layer</small></h1>
+<p>Détection et contrôle des capteurs/actionneurs agricoles.</p>
+
+<div style="margin:12px 0;"><button class="btn" onclick="detectAll()">🔍 Détecter tout le matériel</button></div>
+<div id="detect-status"></div>
+
+<div class="hal-grid">
+  <div class="card"><h3>📡 Capteurs</h3><div id="sensor-list"></div></div>
+  <div class="card"><h3>⚙️ Actionneurs</h3><div id="actuator-list"></div></div>
+</div>
+
+<div class="card"><h3>🖥️ Système</h3><div class="sysinfo" id="sysinfo"></div></div>
+<div class="card"><h3>📊 Statistiques</h3><div id="hal-stats"></div></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function detectAll() {
+  document.getElementById("detect-status").innerHTML = "Scanning...";
+  const r = await fetch("/api/pixhal/detect", {method:"POST"});
+  const data = await r.json();
+  document.getElementById("detect-status").innerHTML = `<span style="color:#00d2ff;">✅ Détecté à ${data.detected_at || 'now'}</span>`;
+  renderSensors(data.sensors);
+  renderActuators(data.actuators);
+  renderSystem(data.system);
+  loadStats();
+}
+
+function renderSensors(sensors) {
+  const keys = Object.keys(sensors);
+  document.getElementById("sensor-list").innerHTML = keys.length === 0
+    ? '<p style="color:#888;">Aucun capteur détecté.</p>'
+    : keys.map(id => {
+        const s = sensors[id];
+        return `<div class="device-card sensor">
+          <div><strong>${id}</strong> <span style="color:#00d2ff;">${s.model||''}</span></div>
+          <div style="font-size:12px;color:#888;">${s.type || ''} · ${s.protocol}${s.addr ? ' @ '+s.addr : ''}${s.pin ? ' · pin '+s.pin : ''}</div>
+          <button class="btn" style="padding:4px 10px;font-size:12px;margin-top:4px;" onclick="readSensor('${id}')">Lire</button>
+          <span id="val-${id}"></span>
+        </div>`;
+      }).join('');
+}
+
+function renderActuators(actuators) {
+  const keys = Object.keys(actuators);
+  document.getElementById("actuator-list").innerHTML = keys.length === 0
+    ? '<p style="color:#888;">Aucun actionneur.</p>'
+    : keys.map(id => {
+        const a = actuators[id];
+        return `<div class="device-card actuator">
+          <div><strong>${id}</strong></div>
+          <div style="font-size:12px;color:#888;">${a.protocol || ''}${a.pin ? ' · pin '+a.pin : ''}</div>
+          <button class="btn" style="padding:4px 10px;font-size:12px;margin-top:4px;" onclick="setActuator('${id}',1)">ON</button>
+          <button class="btn" style="padding:4px 10px;font-size:12px;margin-top:4px;" onclick="setActuator('${id}',0)">OFF</button>
+          <span id="act-${id}"></span>
+        </div>`;
+      }).join('');
+}
+
+async function readSensor(id) {
+  const r = await fetch(`/api/pixhal/sensor/${id}/read`);
+  const data = await r.json();
+  document.getElementById("val-"+id).textContent = ' → '+JSON.stringify(data);
+}
+
+async function setActuator(id, state) {
+  const r = await fetch(`/api/pixhal/actuator/${id}/write`, {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({state}),
+  });
+  const data = await r.json();
+  document.getElementById("act-"+id).textContent = ' → '+JSON.stringify(data);
+}
+
+function renderSystem(sys) {
+  if (!sys) return;
+  document.getElementById("sysinfo").innerHTML = Object.entries(sys).map(([k,v]) =>
+    `<div class="item"><label>${k}</label>${v}</div>`
+  ).join('');
+}
+
+async function loadStats() {
+  const r = await fetch("/api/pixhal/stats");
+  const s = await r.json();
+  document.getElementById("hal-stats").innerHTML = Object.entries(s).map(([k,v]) =>
+    `<div class="stat-card"><div class="stat-value">${v}</div><div>${k}</div></div>`
+  ).join('');
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  const r = await fetch("/api/pixhal/devices");
+  const data = await r.json();
+  renderSensors(data.sensors);
+  renderActuators(data.actuators);
+  const sys = await fetch("/api/pixhal/system").then(r=>r.json());
+  renderSystem(sys);
+  loadStats();
+});
+</script>
+{% endblock %}
