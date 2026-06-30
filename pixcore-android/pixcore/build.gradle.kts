@@ -10,6 +10,9 @@ android {
     defaultConfig {
         minSdk = 26
         consumerProguardFiles("consumer-rules.pro")
+
+        group = "com.pixelos"
+        version = "1.0.0"
     }
 
     compileOptions {

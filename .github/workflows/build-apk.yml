@@ -1,0 +1,89 @@
+name: Build PixOS APK
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  build-pixos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { java-version: 17, distribution: temurin }
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build PixOS
+        run: cd pixos && gradle assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with: { name: pixos-debug, path: pixos/app/build/outputs/apk/debug/*.apk }
+
+  build-messenger:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { java-version: 17, distribution: temurin }
+      - uses: gradle/actions/setup-gradle@v3
+      - run: cd pixos-messenger && gradle assembleDebug
+      - uses: actions/upload-artifact@v4
+        with: { name: pixos-messenger-debug, path: pixos-messenger/app/build/outputs/apk/debug/*.apk }
+
+  build-connect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { java-version: 17, distribution: temurin }
+      - uses: gradle/actions/setup-gradle@v3
+      - run: cd pixconnect && gradle assembleDebug
+      - uses: actions/upload-artifact@v4
+        with: { name: pixconnect-debug, path: pixconnect/app/build/outputs/apk/debug/*.apk }
+
+  build-livestream:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { java-version: 17, distribution: temurin }
+      - uses: gradle/actions/setup-gradle@v3
+      - run: cd pixos-livestream && gradle assembleDebug
+      - uses: actions/upload-artifact@v4
+        with: { name: pixos-livestream-debug, path: pixos-livestream/app/build/outputs/apk/debug/*.apk }
+
+  build-office:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { java-version: 17, distribution: temurin }
+      - uses: gradle/actions/setup-gradle@v3
+      - run: cd pixos-office && gradle assembleDebug
+      - uses: actions/upload-artifact@v4
+        with: { name: pixos-office-debug, path: pixos-office/app/build/outputs/apk/debug/*.apk }
+
+  build-phone:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { java-version: 17, distribution: temurin }
+      - uses: gradle/actions/setup-gradle@v3
+      - run: cd pixos-phone && gradle assembleDebug
+      - uses: actions/upload-artifact@v4
+        with: { name: pixos-phone-debug, path: pixos-phone/app/build/outputs/apk/debug/*.apk }
+
+  build-nop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { java-version: 17, distribution: temurin }
+      - uses: gradle/actions/setup-gradle@v3
+      - run: cd pixos-nop && gradle assembleDebug
+      - uses: actions/upload-artifact@v4
+        with: { name: pixos-nop-debug, path: pixos-nop/app/build/outputs/apk/debug/*.apk }
