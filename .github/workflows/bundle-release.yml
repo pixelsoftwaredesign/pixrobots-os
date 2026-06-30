@@ -1,0 +1,95 @@
+name: Build All PixOS Apps Bundle
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (ex: v1.0.0)'
+        required: false
+        default: 'latest'
+
+jobs:
+  build-all:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app:
+          - pixos
+          - pixos-messenger
+          - pixconnect
+          - pixos-livestream
+          - pixos-office
+          - pixos-phone
+          - pixos-nop
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout pixcore-android SDK
+        uses: actions/checkout@v4
+        with:
+          repository: pixelsoftwaredesign/pixcore-android
+          path: pixcore-android
+
+      - uses: actions/setup-java@v4
+        with: { java-version: 17, distribution: temurin }
+
+      - uses: gradle/actions/setup-gradle@v3
+
+      - name: Build ${{ matrix.app }}
+        working-directory: ${{ matrix.app }}
+        run: gradle assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}
+          path: ${{ matrix.app }}/app/build/outputs/apk/debug/*.apk
+
+  create-bundle:
+    needs: build-all
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: apks }
+
+      - name: Create bundle
+        run: |
+          mkdir -p bundle
+          find apks -name "*.apk" -exec cp {} bundle/ \;
+          cd bundle
+          ls -la
+          echo "---" > MANIFEST.txt
+          echo "PixOS Bundle ${{ github.event.inputs.version || 'latest' }}" >> MANIFEST.txt
+          echo "Date: $(date -u)" >> MANIFEST.txt
+          echo "Apps:" >> MANIFEST.txt
+          for f in *.apk; do
+            size=$(stat -c%s "$f")
+            echo "  - $f ($(( size / 1024 )) KB)" >> MANIFEST.txt
+          done
+          cat MANIFEST.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pixos-bundle
+          path: bundle/*
+
+  release:
+    if: github.event.inputs.version != 'latest' && github.event.inputs.version != ''
+    needs: create-bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: pixos-bundle, path: bundle }
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          files: bundle/*
+          body: |
+            # PixOS Bundle ${{ github.event.inputs.version }}
+
+            Téléchargez et installez les APK sur votre appareil Android.
+            Activer "Installation depuis des sources inconnues" dans les paramètres.
