@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """Pixel Wallet â€” Gestion des portefeuilles BITROOT (BRT).
 
 Architecture:

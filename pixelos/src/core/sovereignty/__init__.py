@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Souveraineté PixelOS — Charte, DDNS, Responsabilité.
 
 Protège juridiquement la communauté en affirmant que chaque

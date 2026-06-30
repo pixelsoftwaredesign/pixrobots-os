@@ -1,3 +1,4 @@
+# Pixel Software Design ó Copyright 2026
 """Provisioning automatique des capteurs d√©couverts dans les zones."""
 
 import os

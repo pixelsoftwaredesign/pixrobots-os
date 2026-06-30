@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 #!/usr/bin/env python3
 """
 RobotFirewall — Générateur et applicateur de règles PF pour robots PixelOS.

@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 #!/usr/bin/env python3
 """NOP Browser Desktop â€” Standalone PyQt6 QWebEngine browser with Web3 resolution."""
 

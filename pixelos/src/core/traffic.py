@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """
 PixTraffic â€” Code de la Route PixelOS.
 

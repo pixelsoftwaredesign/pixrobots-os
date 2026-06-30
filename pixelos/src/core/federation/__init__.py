@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Module Fédération PixelOS — réseau mondial de biodiversité.
 
 Modules:

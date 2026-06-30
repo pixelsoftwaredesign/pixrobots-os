@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """FTP Manager â€” Gestion des utilisateurs et zones FTP."""
 
 import os, subprocess, json

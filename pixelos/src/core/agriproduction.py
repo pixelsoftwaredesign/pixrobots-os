@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """AgriProduction — Prévision pré-récolte, cycle récolte, tri, étiquetage, distribution.
 
 Extension du HarvestManager avec cycle complet:

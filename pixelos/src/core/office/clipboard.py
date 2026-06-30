@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Pixel Clipboard — Presse-papier unifié entre les apps Pixel Office.
 
 Permet de copier-coller entre Pixel Access → Pixel Word → Pixel Excel

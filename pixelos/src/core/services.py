@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """Gestionnaire de services PixelOS.
 
 Centralise le cycle de vie de tous les services :

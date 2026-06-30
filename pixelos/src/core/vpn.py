@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """VPN Manager â€” WireGuard tunnel + DNS forwarder."""
 
 import os, sys, json, socket, subprocess, time

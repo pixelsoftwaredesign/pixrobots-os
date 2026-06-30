@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """rl_controller â€” Reinforcement Learning pour irrigation et chauffage.
 
 Q-learning avec etats discrets pour ajuster les vannes d'irrigation et les

@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 #!/usr/bin/env python3
 """NOP Desktop Bridge â€” Connects the Qt browser to NOP core modules.
 

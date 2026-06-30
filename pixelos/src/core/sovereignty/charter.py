@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Charte de Souveraineté PixelOS.
 
 Affichée au premier démarrage et accessible via l'API.

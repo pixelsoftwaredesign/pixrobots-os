@@ -1,3 +1,4 @@
+# Pixel Software Design ó Copyright 2026
 """Gestion centralis√©e de la configuration PixelOS."""
 
 import os

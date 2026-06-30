@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """updater — Mise à jour de PixelOS (online + offline).
 
 Supporte 4 modes:

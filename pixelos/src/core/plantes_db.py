@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """Interface avec la base de donnees agronomique MySQL."""
 
 import pymysql

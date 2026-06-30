@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """
 PixelOS Core - Bibliothèque centrale pour le système de gestion agricole.
 """

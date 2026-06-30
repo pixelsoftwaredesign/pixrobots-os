@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Pixel Exchange — Marché P2P BITROOT entre membres de la communauté.
 
 Architecture:

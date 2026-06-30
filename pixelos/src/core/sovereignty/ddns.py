@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Système DDNS PixelOS — Sous-domaines *.pixelos.org.
 
 Permet aux nœuds d'obtenir un sous-domaine gratuit avec

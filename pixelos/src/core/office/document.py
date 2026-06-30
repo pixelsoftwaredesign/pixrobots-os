@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """Moteur Pixel Document â€” format commun, CRDT, rendu.
 
 Tous les documents Pixel Office (Word, Excel, Access) utilisent:

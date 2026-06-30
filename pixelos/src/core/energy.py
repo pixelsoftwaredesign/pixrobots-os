@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """PixelOS EnergyManager - Gestion energetique solaire.
 
 Architecture:

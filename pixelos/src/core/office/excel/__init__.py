@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Pixel Excel — Moteur de calcul et grille de tableur.
 
 Fonctionnalités:

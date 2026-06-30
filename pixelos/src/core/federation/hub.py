@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """PixelHub API — protocole fédéré d'échange entre nœuds PixelOS."""
 
 from __future__ import annotations

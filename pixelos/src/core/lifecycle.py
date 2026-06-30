@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """PixelOS LifecycleManager - Cycle de vie des produits agricoles.
 
 Architecture:

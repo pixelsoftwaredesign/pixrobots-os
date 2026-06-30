@@ -1,3 +1,4 @@
+# Pixel Software Design ó Copyright 2026
 """PixelOS TaskManager - Gestion des t√¢ches agricoles."""
 
 import json

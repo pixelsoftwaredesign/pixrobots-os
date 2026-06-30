@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Pont Matrix avancé — Gestion des salles, utilisateurs, bridge IoT.
 
 Remplace/étend l'ancien matrix_bridge.py avec :

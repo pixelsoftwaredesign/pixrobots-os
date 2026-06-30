@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """
 DronePilot — Robot aérien inspecteur.
 Hérite de RobotNode avec capacités de vol MAVLink et droit

@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Pont Matrix — Messagerie temps réel pour la communauté PixelOS.
 
 Permet:

@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """
 TrafficController — Gestion centralisée du trafic et des collisions.
 

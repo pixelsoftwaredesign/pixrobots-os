@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Ontologie Agricole PixelOS — Structure de données unifiée pour l'échange inter-systèmes.
 
 Permet de comparer des données culturales entre n'importe quelle région du monde

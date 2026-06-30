@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """PixelOS SpaceManager - Gestion hierarchique des espaces agricoles.
 
 Architecture:

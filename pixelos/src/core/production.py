@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """production — Gestion de production agricole : préparation du sol et mise en place arbres.
 
 Workflow complet:

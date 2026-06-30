@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Bioinformatique PixelOS — Analyses génomiques, phylogénie, métagénomique.
 
 Workflows:

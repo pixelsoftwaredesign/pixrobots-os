@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Moteur de prédiction IA pour l'irrigation intelligente.
 
 Utilise les séries temporelles MongoDB pour prédire :

@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """
 TrafficManager — Règles de circulation complètes PixRobots.
 

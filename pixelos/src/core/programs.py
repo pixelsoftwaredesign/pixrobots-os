@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """PixelOS Programs - Gestion des programmes Text, Audio, Video."""
 
 import os

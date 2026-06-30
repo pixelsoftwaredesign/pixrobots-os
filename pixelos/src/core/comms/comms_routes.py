@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """Routes API Pixel Comms â€” Communication Matrix."""
 
 from flask import Blueprint, jsonify, request, render_template

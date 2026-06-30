@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 from .pixstat import PixStat
 from .pixdefend import PixDefend
 from .pixscudo import PixScudo

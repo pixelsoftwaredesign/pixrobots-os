@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """discovery — Découverte, fingerprinting et catalogage unifié des dispositifs IoT.
 
 Supporte 4 protocoles : Wi-Fi (mDNS/MQTT), BLE, Radio (LoRa/433MHz), Modbus RS485.

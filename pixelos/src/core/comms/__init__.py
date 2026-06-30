@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Pixel Comms — Module de communication décentralisé PixelOS.
 
 Architecture:

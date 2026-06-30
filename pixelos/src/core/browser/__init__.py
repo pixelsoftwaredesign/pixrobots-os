@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 from .nop_browser import NOPBrowser
 from .nop_resolver import NOPResolver
 from .nop_privacy import NOPPrivacy

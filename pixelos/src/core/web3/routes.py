@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """Routes API Web3/Pixel Pay pour l'interface Flask PixelOS."""
 
 from flask import Blueprint, jsonify, request, render_template

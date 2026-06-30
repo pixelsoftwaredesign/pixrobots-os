@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """dns — Serveur DNS autoritaire PixelOS pour résolution privée.
 
 TLD privé PixelOS : .pxl

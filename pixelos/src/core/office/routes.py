@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """Routes Pixel Office Suite â€” Access, Word, Excel."""
 
 

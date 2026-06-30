@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 import subprocess
 import os
 import hashlib

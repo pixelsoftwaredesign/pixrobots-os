@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Routes API Souveraineté — Charte, DDNS, Disclaimer."""
 
 from flask import Blueprint, jsonify, request, render_template

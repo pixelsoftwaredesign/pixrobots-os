@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Pixel Access — Interface base de données agricole.
 
 Connectée directement à bgdatasys et aux capteurs IoT.

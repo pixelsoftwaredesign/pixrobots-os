@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """bgdatasys â€” Couche d'abstraction Data unifiee pour PixelOS.
 
 4 couches de stockage:

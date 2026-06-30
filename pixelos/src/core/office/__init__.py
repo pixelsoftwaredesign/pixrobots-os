@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """Pixel Office Suite â€” Suite bureautique agricole intelligente.
 
 Modules:

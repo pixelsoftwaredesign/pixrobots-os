@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """Vision par ordinateur PixelOS â€” Suivi de croissance, segmentation, NDVI.
 
 Modules:

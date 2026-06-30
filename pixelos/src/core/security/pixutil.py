@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 import argparse
 import json
 import sys

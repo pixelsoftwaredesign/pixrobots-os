@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """PixelOS GeothermalControl - Regulation thermique des sols agricoles.
 
 Architecture:

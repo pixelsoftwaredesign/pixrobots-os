@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Pixel Word — Éditeur de rapports agricoles.
 
 Basé sur Markdown + rich text, avec:

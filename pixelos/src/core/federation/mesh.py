@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """WireGuard Mesh — réseau P2P entre nœuds PixelOS fédérés."""
 
 from __future__ import annotations

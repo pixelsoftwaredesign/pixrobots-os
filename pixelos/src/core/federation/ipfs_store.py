@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Stockage décentralisé IPFS pour les données biodiversité PixelOS.
 
 Permet à chaque nœud de:

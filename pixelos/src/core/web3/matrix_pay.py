@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """MatrixPay Bridge â€” Notifications de paiement via Matrix.
 
 Relie le moteur de paiement BITROOT au bridge Matrix existant

@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """Pixel Pay â€” Moteur de paiement P2P BITROOT (BRT).
 
 Architecture:

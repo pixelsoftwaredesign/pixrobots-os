@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Standard Biodiversité PixelOS — format universel pour décrire espèces et races."""
 
 from __future__ import annotations

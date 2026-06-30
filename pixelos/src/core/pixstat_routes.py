@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 from flask import Blueprint, request, jsonify, render_template
 from .pixstat import PixStat
 

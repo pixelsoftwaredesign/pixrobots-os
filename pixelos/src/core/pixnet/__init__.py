@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 from .pixcrawler import PixCrawler
 from .pixsearch import PixSearch
 from .pixtrust import PixTrust

@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Pont Web3 IPFS — Souveraineté décentralisée pour PixelOS.
 
 Fonctionnalités:

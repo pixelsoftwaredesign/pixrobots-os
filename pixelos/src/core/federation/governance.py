@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Gouvernance PixelOS — signatures, consensus, mises à jour communautaires."""
 
 from __future__ import annotations

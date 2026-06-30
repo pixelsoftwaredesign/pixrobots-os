@@ -1,3 +1,4 @@
+# Pixel Software Design ó Copyright 2026
 """Client MQTT centralis√© PixelOS."""
 
 import json

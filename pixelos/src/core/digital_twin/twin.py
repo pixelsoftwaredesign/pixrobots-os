@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 #!/usr/bin/env python3
 """
 Digital Twin — Jumeau numérique temps réel.

@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Pôle Laboratoire PixelOS — Analyses sol, microbiome, microscopie, croissance, génétique.
 
 Architecture:

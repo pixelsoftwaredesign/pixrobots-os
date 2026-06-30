@@ -1,3 +1,4 @@
+# Pixel Software Design ó Copyright 2026
 """Sauvegarde et restauration du syst√®me PixelOS."""
 
 import os

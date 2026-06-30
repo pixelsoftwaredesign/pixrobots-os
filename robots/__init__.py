@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 from .base import RobotNode, RobotMission, MISSION_STATUS
 from .inspecteur import RobotInspecteur
 from .transporteur import RobotTransporteur

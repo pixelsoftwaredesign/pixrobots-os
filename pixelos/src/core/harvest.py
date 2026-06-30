@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """PixelOS HarvestManager - Prevision recolte, poids/prix, lots, etiquettes, inventaire.
 
 Architecture:

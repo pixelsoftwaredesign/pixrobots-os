@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """TimescaleDB — Migration MongoDB → TimescaleDB pour séries temporelles agricoles.
 
 Hypertables, continuous aggregates, catalog capteurs, events, prédictions.

@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Protocole PixelNode — auto-provisioning, clés, fédération P2P."""
 
 from __future__ import annotations

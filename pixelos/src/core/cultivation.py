@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 """PixelOS CultivationManager - Orchestration intelligente de la production agricole.
 
 Integration transverse entre:

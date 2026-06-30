@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 #!/usr/bin/env python3
 """
 RobotInspecteur â€” Robot de surveillance et diagnostic des cultures.

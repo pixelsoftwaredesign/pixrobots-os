@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Module Web3 PixelOS — BITROOT (BRT), Wallet, Paiement P2P, Échange, IPFS Web3.
 
 Architecture:

@@ -1,3 +1,4 @@
+# Pixel Software Design — Copyright 2026
 #!/usr/bin/env python3
 """
 PixAuto â€” IA d'automatisation agricole PixelOS.

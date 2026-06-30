@@ -1,3 +1,4 @@
+# Pixel Software Design � Copyright 2026
 """Portal Bootstrap PixelOS — page communautaire + téléchargement ISO."""
 
 from __future__ import annotations
