@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PixConnect</string>
+    <style name="Theme.PixConnect" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">#004D40</item>
+        <item name="android:statusBarColor">#00695C</item>
+    </style>
+</resources>
