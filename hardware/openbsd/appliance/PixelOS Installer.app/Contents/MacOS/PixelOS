@@ -1,0 +1,43 @@
+#!/bin/bash
+# PixelOS Installer.app — macOS double-click installer
+# Ce fichier est le binaire principal du bundle .app
+DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Afficher un dialogue d'information
+osascript -e 'tell app "System Events" to display dialog "PixelOS Installer
+
+Cet assistant va créer une clé USB bootable PixelOS sur votre Mac.
+
+Vous aurez besoin de:
+• Une clé USB (8 Go minimum)
+• Un mot de passe administrateur
+
+Voulez-vous continuer?" buttons {"Annuler", "Continuer"} default button "Continuer" with icon caution' 2>/dev/null
+
+if [ $? -ne 0 ]; then
+    exit 0
+fi
+
+# Demander le mot de passe administrateur
+PASSWORD=$(osascript -e 'text returned of (display dialog "PixelOS Installer nécessite des privilèges administrateur pour écrire sur le disque.
+
+Entrez votre mot de passe Mac:" default answer "" with hidden answer with icon stop buttons {"Annuler", "OK"} default button "OK")' 2>/dev/null)
+
+if [ $? -ne 0 ] || [ -z "$PASSWORD" ]; then
+    exit 0
+fi
+
+# Lancer l'installation avec sudo
+echo "$PASSWORD" | sudo -S -p "" "${DIR}/Resources/install_pixelos_mac.sh"
+
+if [ $? -eq 0 ]; then
+    osascript -e 'tell app "System Events" to display dialog "✅ Installation terminée !
+
+La clé USB PixelOS est prête.
+
+1. Insérez la clé dans le Mac cible
+2. Redémarrez en maintenant Option (⌥)
+3. Choisissez EFI Boot
+
+Bienvenue dans la communauté internationale PixelOS ! 🌱" buttons {"OK"} default button "OK" with icon note'
+fi

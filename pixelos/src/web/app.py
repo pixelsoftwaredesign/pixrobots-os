@@ -136,6 +136,13 @@ if HAS_FLASK:
     except Exception as e:
         print(f"⚠️  Digital Twin routes non chargées: {e}")
 
+    # Routes Zero-Touch Installer
+    try:
+        from core.boot.routes import register_install_routes
+        register_install_routes(app)
+    except Exception as e:
+        print(f"⚠️  Installer routes non chargées: {e}")
+
     @app.route("/")
     def index():
         return render_template("index.html", title="PixelOS - AgriCol")

@@ -7,11 +7,18 @@ from pathlib import Path
 from typing import Any, Optional
 
 
+_PKG_DIR = Path(__file__).resolve().parent.parent.parent  # pixelos/
+
+_ENV_CONFIG = os.environ.get("PIXELOS_CONFIG", "")
 CONFIG_PATHS = [
-    "/etc/pixelos/pixelos.yaml",
-    "/usr/local/etc/pixelos/pixelos.yaml",
-    "./config/pixelos.yaml",
-    os.path.expanduser("~/.pixelos.yaml"),
+    p for p in [
+        _ENV_CONFIG,
+        "/etc/pixelos/pixelos.yaml",
+        "/usr/local/etc/pixelos/pixelos.yaml",
+        str(_PKG_DIR / "config" / "pixelos.yaml"),
+        "./config/pixelos.yaml",
+        os.path.expanduser("~/.pixelos.yaml"),
+    ] if p
 ]
 
 

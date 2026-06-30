@@ -1,0 +1,56 @@
+{
+  "species_id": "",
+  "nom_scientifique": "Olea europaea var. sylvestris",
+  "nom_commun": "Olivier sauvage",
+  "noms_locaux": [],
+  "famille": "Oleaceae",
+  "genre": "Olea",
+  "rang": "espece",
+  "regne": "vegetal",
+  "groupe": "",
+  "type_race": "rare",
+  "conservation": {
+    "status": "vulnerable",
+    "source": "association",
+    "population_estimee": 0,
+    "tendance": "",
+    "menaces": [],
+    "dernier_recensement": ""
+  },
+  "confidentialite": "public",
+  "origine": {
+    "latitude": 0.0,
+    "longitude": 0.0,
+    "altitude_m": null,
+    "region": "Méditerranée",
+    "pays": "Maroc",
+    "biome": "mediterraneen"
+  },
+  "cultivation": {
+    "besoin_eau": "faible",
+    "type_sol": [],
+    "ph_min": 5.5,
+    "ph_max": 7.5,
+    "temperature_min_c": 0,
+    "temperature_max_c": 40,
+    "temperature_optimale_c": 20,
+    "exposition": "",
+    "cycle_vie_jours": 0,
+    "rusticite": "",
+    "besoin_froid_h": 0
+  },
+  "usages": [],
+  "genome": {
+    "sequence_type": "",
+    "marker": "",
+    "reference_url": "",
+    "gc_content_pct": null
+  },
+  "seed_stocks": [],
+  "banque_url": "",
+  "createur_id": "9ca829e50dc20d39",
+  "signature": "",
+  "date_creation": "2026-06-30T01:15:02.838897",
+  "date_modification": "",
+  "version": 1
+}

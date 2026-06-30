@@ -1,0 +1,16 @@
+#!/bin/sh
+# PixelOS - OpenBSD rc.d service for PixelOS Agent daemon
+# Install: cp pixelos_agent /etc/rc.d/
+# Enable: rcctl enable pixelos_agent
+
+daemon="/usr/local/libexec/pixelos/agent.py"
+daemon_flags="--boot"
+daemon_user="_pixelos"
+
+. /etc/rc.d/rc.subr
+
+pexp="python3 ${daemon} ${daemon_flags}"
+rc_bg=YES
+rc_reload=NO
+
+rc_cmd $1

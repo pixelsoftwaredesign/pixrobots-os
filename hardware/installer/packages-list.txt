@@ -1,0 +1,12 @@
+# PixelOS - Paquets OpenBSD à télécharger offline
+# Généré avec: pkg_info -m -z > packages-list.txt
+# Téléchargement: cd packages && for pkg in $(cat ../packages-list.txt); do ftp https://cdn.openbsd.org/pub/OpenBSD/7.6/packages/amd64/${pkg}; done
+mosquitto-2.0.18p0.tgz
+node-red-4.0.3p0.tgz
+python-3.12.5p0.tgz
+py3-pip-24.2.tgz
+py3-serial-3.5p1.tgz
+py3-paho-mqtt-2.1.0.tgz
+rsync--3.3.0p0.tgz
+git-2.47.0p0.tgz
+influxdb-1.12.0p0.tgz

@@ -1,0 +1,38 @@
+; PixelOS — Zone DNS .pixel (TLD privé réseau fédéré)
+; /var/nsd/zones/pixel.zone
+$ORIGIN pixel.
+$TTL 3600
+
+@   IN SOA ns1.pixel. admin.pixel. (
+    2026062901  ; serial (YYYYMMDDNN)
+    7200        ; refresh
+    3600        ; retry
+    604800      ; expire
+    3600        ; minimum
+)
+
+; Nameservers
+@       NS      ns1.pixel.
+@       NS      ns2.pixel.
+
+; Serveurs
+ns1     A       10.0.0.1
+ns2     A       10.0.0.2
+
+; Services PixelOS (résolution locale)
+hub     A       10.0.0.1
+web     A       10.0.0.1
+api     A       10.0.0.1
+mqtt    A       10.0.0.1
+db      A       10.0.0.1
+auth    A       10.0.0.1
+ftp     A       10.0.0.1
+chat    A       10.0.0.1
+
+; Enregistrement générique pour les nœuds fédérés
+; Chaque nœud s'enregistre sous <node_id>.node.pixel
+; Mise à jour dynamique via l'API PixelHub
+
+; Biodiversité - accès à la base mondiale
+biodiv  A       10.0.0.1
+species A       10.0.0.1

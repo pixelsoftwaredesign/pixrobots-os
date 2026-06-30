@@ -35,12 +35,32 @@ services:
     networks:
       - agricol-net
 
+  timescaledb:
+    image: timescale/timescaledb:2.17.2-pg16
+    container_name: agricol-tsdb
+    environment:
+      POSTGRES_DB: pixelos_ts
+      POSTGRES_USER: pixelos
+      POSTGRES_PASSWORD: pixelos_secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - tsdb_data:/var/lib/postgresql/data
+    networks:
+      - agricol-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pixelos -d pixelos_ts"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   # backend: (lancé via Maven directement)
   #   build: ../backend
 
 volumes:
   mysql_data:
   mongodb_data:
+  tsdb_data:
 
 networks:
   agricol-net:

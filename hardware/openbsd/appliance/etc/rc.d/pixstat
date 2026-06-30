@@ -1,0 +1,19 @@
+#!/bin/ksh
+# rc.d/pixstat — Service PixStat (monitoring réseau Pixel OS)
+#
+# Installation:
+#   doas cp etc/rc.d/pixstat /etc/rc.d/
+#   doas chmod 755 /etc/rc.d/pixstat
+#   doas rcctl enable pixstat
+#   doas rcctl start pixstat
+
+daemon="/usr/local/bin/pixutil --status"
+daemon_user="root"
+
+. /etc/rc.d/rc.subr
+
+rc_reload=NO
+
+pexp="$daemon"
+
+rc_cmd $1

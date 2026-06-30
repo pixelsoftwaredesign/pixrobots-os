@@ -49,8 +49,19 @@ class Agent:
         if self.role == "unknown":
             self._detect_role()
 
+        # Composants intégrés
+        self._collector = None
+        self._edge_inference = None
+        self._rl_controllers: dict[str, any] = {}
+        self._training_scheduler = None
+
     def _stop(self, *args):
         self.running = False
+        if self._collector:
+            try:
+                self._collector.stop()
+            except Exception:
+                pass
 
     def start(self) -> None:
         log.info("Agent démarré", node=self.node_id, role=self.role,
@@ -66,6 +77,12 @@ class Agent:
         self.mqtt.subscribe(f"pixelos/agent/{self.node_id}/cmd/#",
                             self._on_command)
         self.mqtt.subscribe("pixelos/agent/all/cmd/#", self._on_command)
+
+        # Démarrage collecteur asynchrone MQTT
+        self._start_collector()
+
+        # Chargement du moteur ONNX edge
+        self._init_edge_inference()
 
         while self.running:
             try:
@@ -83,9 +100,23 @@ class Agent:
                 # Vérification alertes locales
                 self._check_alerts(metrics)
 
-                # Surveillance des tâches urgentes (toutes les 5 minutes)
+                # Inférence edge à chaque cycle
+                self._run_edge_inference()
+
+                # Surveillance (toutes les 5 minutes)
                 if int(time.time()) % 300 < self._interval:
                     self._monitor_tasks()
+                    self._monitor_geothermal()
+                    self._monitor_energy()
+                    self._monitor_lifecycle()
+                    self._monitor_harvest()
+                    self._monitor_cultivation()
+                    self._monitor_ml()
+                    self._monitor_lab()
+                    self._monitor_rl()
+                    self._monitor_rl_reward()
+                    self._monitor_discovery()
+                    self._monitor_production()
 
                 time.sleep(self._interval)
 
@@ -235,6 +266,498 @@ class Agent:
                 "severity": "critical",
             })
 
+    def _monitor_energy(self) -> None:
+        """Surveille l'etat energetique et publie sur MQTT."""
+        try:
+            from core.energy import EnergyManager
+            em = EnergyManager()
+            em.run_cycle()
+            summary = em.summary()
+
+            self.mqtt.publish("pixelos/energy/status", {
+                "node": self.node_id,
+                "solar_w": summary["current_solar_w"],
+                "load_w": summary["current_load_w"],
+                "battery_soc": summary["battery_soc"],
+                "grid_available": summary["grid_available"],
+                "ts": datetime.now().isoformat(),
+            })
+
+            # Alertes batterie faible
+            if summary["battery_soc"] < 20:
+                log.warning("Batterie faible", soc=summary["battery_soc"])
+                self.mqtt.publish("pixelos/energy/alert", {
+                    "node": self.node_id,
+                    "type": "battery_low",
+                    "soc": summary["battery_soc"],
+                    "ts": datetime.now().isoformat(),
+                })
+            # Production nulle en jour (possible panne)
+            h = datetime.now().hour
+            if 9 <= h <= 17 and summary["current_solar_w"] < 10 and summary["irradiance"] > 0:
+                log.warning("Production solaire anormalement basse")
+                self.mqtt.publish("pixelos/energy/alert", {
+                    "node": self.node_id,
+                    "type": "solar_low",
+                    "solar_w": summary["current_solar_w"],
+                    "irradiance": summary["irradiance"],
+                    "ts": datetime.now().isoformat(),
+                })
+
+        except ImportError:
+            pass
+        except Exception as e:
+            log.warning("Erreur surveillance energie", error=str(e))
+
+    def _monitor_geothermal(self) -> None:
+        """Surveille les anomalies geothermie et cree taches si besoin."""
+        try:
+            from core.geothermal import GeothermalManager
+            gm = GeothermalManager()
+            anomalies = gm.check_anomalies()
+            if anomalies:
+                log.warning("Anomalies geothermiques detectees", count=len(anomalies))
+                self.mqtt.publish("pixelos/geothermal/anomaly", {
+                    "node": self.node_id,
+                    "count": len(anomalies),
+                    "anomalies": anomalies,
+                    "ts": datetime.now().isoformat(),
+                })
+                from core.tasks import TaskManager
+                tm = TaskManager()
+                for a in anomalies:
+                    zone_name = a["zone"]
+                    tm.create_task(
+                        title=f"Maintenance geothermie: {zone_name}",
+                        description=a["message"],
+                        priority="urgent" if a["severity"] == "critical" else "high",
+                        category="maintenance",
+                        zone=zone_name.split(" ")[-1].lower(),
+                    )
+                log.info("Taches creees depuis anomalies geothermie",
+                         count=len(anomalies))
+        except ImportError:
+            pass
+        except Exception as e:
+            log.warning("Erreur surveillance geothermie", error=str(e))
+
+    def _monitor_lifecycle(self) -> None:
+        """Genere automatiquement les taches basees sur les cycles de vie."""
+        try:
+            from core.lifecycle import LifecycleManager
+            lm = LifecycleManager()
+            tasks = lm.generate_tasks(force=False)
+            if tasks:
+                log.info("Taches generees depuis cycles de vie", count=len(tasks))
+                self.mqtt.publish("pixelos/lifecycle/tasks", {
+                    "node": self.node_id,
+                    "count": len(tasks),
+                    "tasks": tasks[:5],
+                    "ts": datetime.now().isoformat(),
+                })
+
+            suggestions = lm.get_suggestions()
+            if suggestions:
+                log.info("Suggestions lifecycle", count=len(suggestions))
+                urgent = [s for s in suggestions if s.get("priority") == "high"]
+                if urgent:
+                    self.mqtt.publish("pixelos/lifecycle/suggestions", {
+                        "node": self.node_id,
+                        "count": len(suggestions),
+                        "urgent": len(urgent),
+                        "suggestions": urgent[:3],
+                        "ts": datetime.now().isoformat(),
+                    })
+        except ImportError:
+            pass
+        except Exception as e:
+            log.warning("Erreur surveillance lifecycle", error=str(e))
+
+    def _monitor_harvest(self) -> None:
+        """Suggestions de recolte et publication MQTT."""
+        try:
+            from core.harvest import HarvestManager
+            hm = HarvestManager()
+            hm.estimate_all()
+            suggestions = hm.get_harvest_suggestions()
+            if suggestions:
+                log.info("Suggestions recolte", count=len(suggestions))
+                self.mqtt.publish("pixelos/harvest/suggestions", {
+                    "node": self.node_id,
+                    "count": len(suggestions),
+                    "suggestions": suggestions[:5],
+                    "ts": datetime.now().isoformat(),
+                })
+                from core.tasks import TaskManager
+                tm = TaskManager()
+                for sg in suggestions:
+                    tm.create_task(
+                        title=sg["message"][:100],
+                        description=(f"Recolte estimee: {sg['estimated_kg']}kg, "
+                                     f"{sg['estimated_value']:.2f}EUR"),
+                        priority="high",
+                        category="recolte",
+                        zone=sg["zone"],
+                    )
+                log.info("Taches recolte creees", count=len(suggestions))
+
+            inv = hm.inventory.snapshot()
+            self.mqtt.publish("pixelos/harvest/inventory", {
+                "node": self.node_id,
+                "inventory": inv,
+                "ts": datetime.now().isoformat(),
+            })
+        except ImportError:
+            pass
+        except Exception as e:
+            log.warning("Erreur surveillance recolte", error=str(e))
+
+    def _monitor_cultivation(self) -> None:
+        """Surveillance intelligente de la production agricole."""
+        try:
+            from core.cultivation import CultivationManager
+            cm = CultivationManager()
+            result = cm.smart_monitor()
+
+            # Publier deviations sur MQTT
+            if result["deviations"]:
+                log.info("Deviations environnementales detectees",
+                         count=len(result["deviations"]))
+                self.mqtt.publish("pixelos/cultivation/deviations", {
+                    "node": self.node_id,
+                    "count": len(result["deviations"]),
+                    "deviations": result["deviations"][:5],
+                    "ts": datetime.now().isoformat(),
+                })
+
+            # Publier actions auto-control
+            if result["auto_actions"]:
+                log.info("Actions auto-controle", count=len(result["auto_actions"]))
+                self.mqtt.publish("pixelos/cultivation/auto_control", {
+                    "node": self.node_id,
+                    "count": len(result["auto_actions"]),
+                    "actions": result["auto_actions"],
+                    "ts": datetime.now().isoformat(),
+                })
+
+            # Publier taches creees
+            if result["tasks_created"]:
+                log.info("Taches creees par cultivation",
+                         count=len(result["tasks_created"]))
+                self.mqtt.publish("pixelos/cultivation/tasks", {
+                    "node": self.node_id,
+                    "count": len(result["tasks_created"]),
+                    "tasks": result["tasks_created"][:5],
+                    "ts": datetime.now().isoformat(),
+                })
+
+        except ImportError:
+            pass
+        except Exception as e:
+            log.warning("Erreur surveillance cultivation", error=str(e))
+
+    def _monitor_ml(self) -> None:
+        try:
+            if self._training_scheduler is None:
+                from agent.training_scheduler import TrainingScheduler
+                self._training_scheduler = TrainingScheduler(self.mqtt)
+            result = self._training_scheduler.check_and_run()
+            if result["status"] != "skipped":
+                log.info("Auto-retrain ML", **result)
+                if self._edge_inference:
+                    self._edge_inference.reload()
+        except ImportError:
+            pass
+        except Exception as e:
+            log.warning("Erreur surveillance ML", error=str(e))
+
+    def _monitor_lab(self) -> None:
+        """Surveille les analyses laboratoire et notifie les déviations."""
+        try:
+            from core.laboratory import LabManager
+            lm = LabManager()
+            stats = lm.stats()
+
+            # Vérifier les échantillons en attente d'analyse
+            pending = stats.get("samples_by_status", {}).get("collected", 0)
+            if pending > 5:
+                log.info("Échantillons en attente", count=pending)
+                self.mqtt.publish("pixelos/lab/pending", {
+                    "node": self.node_id,
+                    "count": pending,
+                    "ts": datetime.now().isoformat(),
+                })
+
+            # Vérifier la fertilité moyenne
+            avg_f = stats.get("avg_fertility_index", 100)
+            if avg_f < 30:
+                self.mqtt.publish("pixelos/lab/alert", {
+                    "node": self.node_id,
+                    "type": "low_fertility",
+                    "avg_fertility": avg_f,
+                    "ts": datetime.now().isoformat(),
+                })
+                log.warning("Fertilité basse", avg_fertility=avg_f)
+
+        except ImportError:
+            pass
+        except Exception as e:
+            log.warning("Erreur surveillance lab", error=str(e))
+
+    def _monitor_discovery(self) -> None:
+        """Scan périodique des dispositifs IoT (Wi-Fi/BLE/Modbus)."""
+        try:
+            from core.discovery import device_manager
+            stats = device_manager.stats()
+            total = stats.get("total", 0)
+
+            # Scan tous les 10 cycles (~50 min)
+            cycle_key = f"discovery_scan_{self.node_id}"
+            last_scan = getattr(self, cycle_key, 0)
+            now = int(time.time())
+            if now - last_scan > 3000:
+                log.info("Scan dispositifs IoT...")
+                results = device_manager.scan_all(timeout=20)
+                setattr(self, cycle_key, now)
+                new = results.get("total_new", 0)
+                if new > 0:
+                    self.mqtt.publish(f"pixelos/discovery/new", {
+                        "node": self.node_id,
+                        "new_devices": new,
+                        "total": stats["total"],
+                        "by_protocol": stats["by_protocol"],
+                        "ts": datetime.now().isoformat(),
+                    })
+                    log.info("Nouveaux dispositifs découverts", count=new)
+
+            # Publier statut périodique
+            self.mqtt.publish(f"pixelos/discovery/status", {
+                "node": self.node_id,
+                "total_devices": total,
+                "by_protocol": stats["by_protocol"],
+                "by_status": stats["by_status"],
+                "ts": datetime.now().isoformat(),
+            })
+
+        except ImportError:
+            pass
+        except Exception as e:
+            log.warning("Erreur surveillance découverte", error=str(e))
+
+    def _monitor_production(self) -> None:
+        """Surveillance des préparations sol, plantations et plans de production."""
+        try:
+            from core.production import production_manager
+            stats = production_manager.stats()
+
+            self.mqtt.publish(f"pixelos/production/status", {
+                "node": self.node_id,
+                "stats": stats,
+                "ts": datetime.now().isoformat(),
+            })
+
+            if stats.get("active_plans", 0) > 0:
+                log.info("Production active", plans=stats["active_plans"])
+
+        except ImportError:
+            pass
+        except Exception as e:
+            log.warning("Erreur surveillance production", error=str(e))
+
+    def _start_collector(self):
+        """Demarre le collecteur asynchrone MQTT."""
+        try:
+            from agent.collector import MQTTCollector
+            self._collector = MQTTCollector(self.mqtt)
+            self._collector.start()
+            log.info("Collecteur MQTT demarre")
+        except Exception as e:
+            log.warning("Echec demarrage collecteur MQTT", error=str(e))
+
+    def _init_edge_inference(self):
+        """Initialise le moteur d'inference ONNX edge."""
+        try:
+            from agent.edge_inference import EdgeInferenceEngine
+            self._edge_inference = EdgeInferenceEngine(self.mqtt)
+            result = self._edge_inference.load_model()
+            log.info("Edge inference initialise", **result)
+        except Exception as e:
+            log.warning("Echec init edge inference", error=str(e))
+
+    def _run_edge_inference(self):
+        """Execute l'inference edge sur les donnees capteurs recentes."""
+        if not self._edge_inference or not self._edge_inference.is_loaded():
+            return
+        try:
+            from core.bgdatasys import bgdatasys
+            latest = bgdatasys.query_sensors(hours=1, limit=1)
+            if not latest:
+                return
+            sensor_data = {
+                "humidite_sol": latest[0].get("value",
+                                   latest[0].get("humidite_sol", 50)),
+                "temperature": latest[0].get("temperature",
+                                 latest[0].get("temp_air", 20)),
+                "humidite": latest[0].get("humidite_air",
+                              latest[0].get("humidity_air", 50)),
+                "pression": latest[0].get("pression", 1013),
+                "vent": latest[0].get("vent", latest[0].get("wind_speed", 0)),
+            }
+            space_id = latest[0].get("space_id", "serre_a")
+            self._edge_inference.predict_and_act(space_id, sensor_data)
+        except Exception as e:
+            log.warning("Erreur edge inference", error=str(e))
+
+    def _monitor_rl(self) -> None:
+        """Boucle RL: choisit et applique une action d'irrigation/chauffage."""
+        try:
+            from core.rl_controller import RLController, ACTION_LABELS
+            from core.bgdatasys import bgdatasys
+            from core.config import PixelOSConfig
+
+            config = PixelOSConfig()
+            zones = config.get("rl.zones", ["serre_a"])
+
+            for zone_id in zones:
+                if zone_id not in self._rl_controllers:
+                    self._rl_controllers[zone_id] = RLController(zone_id)
+
+                rl = self._rl_controllers[zone_id]
+
+                # Lire les dernieres mesures
+                rows = bgdatasys.query_sensors(space=zone_id, hours=1, limit=5)
+                if not rows:
+                    continue
+
+                avg_moisture = sum(
+                    r.get("value", r.get("humidite_sol", 50)) for r in rows
+                ) / len(rows)
+                avg_temp = sum(
+                    r.get("temperature", r.get("temp_air", 20)) for r in rows
+                ) / len(rows)
+
+                now = datetime.now()
+                action = rl.choose_action(avg_moisture, avg_temp, now.hour)
+
+                # Appliquer l'action via geothermal si disponible
+                try:
+                    from core.geothermal import GeothermalManager
+                    gm = GeothermalManager()
+                    zone_cfg = gm.get_zone(zone_id)
+                    if zone_cfg:
+                        current_valve = zone_cfg.get("valve_pct", 50)
+                        current_setpoint = zone_cfg.get("target_temp", 20)
+                        adjustments = rl.apply_action_to_geothermal(
+                            action, current_valve, current_setpoint)
+                        gm.update_zone(zone_id, **adjustments)
+                except Exception:
+                    pass
+
+                # Publier l'action RL sur MQTT
+                self.mqtt.publish(f"pixelos/{zone_id}/rl/action", {
+                    "action": int(action),
+                    "action_label": ACTION_LABELS[action],
+                    "soil_moisture": round(avg_moisture, 1),
+                    "temperature": round(avg_temp, 1),
+                    "epsilon": round(rl.epsilon, 4),
+                    "ts": now.isoformat(),
+                })
+
+        except ImportError:
+            pass
+        except Exception as e:
+            log.warning("Erreur monitoring RL", error=str(e))
+
+    def _monitor_rl_reward(self) -> None:
+        """Calcule la recompense RL de l'heure precedente et met a jour Q-table."""
+        try:
+            from core.rl_controller import RLController
+            from core.bgdatasys import bgdatasys
+            from core.config import PixelOSConfig
+
+            config = PixelOSConfig()
+            zones = config.get("rl.zones", ["serre_a"])
+
+            for zone_id in zones:
+                if zone_id not in self._rl_controllers:
+                    continue
+
+                rl = self._rl_controllers[zone_id]
+
+                # Lire les mesures de l'heure courante et precedente
+                now = datetime.now()
+                rows_now = bgdatasys.query_sensors(space=zone_id, hours=1, limit=5)
+                rows_before = bgdatasys.query_sensors(space=zone_id, hours=2,
+                                                      limit=5)
+
+                if len(rows_now) < 1 or len(rows_before) < 1:
+                    continue
+
+                avg_moisture_now = sum(
+                    r.get("value", r.get("humidite_sol", 50)) for r in rows_now
+                ) / len(rows_now)
+                avg_temp_now = sum(
+                    r.get("temperature", r.get("temp_air", 20)) for r in rows_now
+                ) / len(rows_now)
+
+                avg_moisture_before = sum(
+                    r.get("value", r.get("humidite_sol", 50)) for r in rows_before
+                ) / len(rows_before)
+                avg_temp_before = sum(
+                    r.get("temperature", r.get("temp_air", 20)) for r in rows_before
+                ) / len(rows_before)
+
+                hour_now = now.hour
+                hour_before = (now - timedelta(hours=1)).hour
+
+                reward = rl.compute_reward(avg_moisture_now, avg_temp_now)
+
+                # Chercher la derniere action effectuee dans l'historique
+                history = rl.history(limit=1)
+                if history:
+                    last_entry = history[-1]
+                    step_result = rl.step(
+                        last_entry.get("prev_moisture", avg_moisture_before),
+                        last_entry.get("prev_temp", avg_temp_before),
+                        hour_before,
+                        last_entry["action"],
+                        avg_moisture_now, avg_temp_now, hour_now, reward,
+                    )
+                else:
+                    step_result = rl.step(
+                        avg_moisture_before, avg_temp_before, hour_before,
+                        rl.choose_action(avg_moisture_before, avg_temp_before,
+                                         hour_before),
+                        avg_moisture_now, avg_temp_now, hour_now, reward,
+                    )
+
+                rl.log_transition({
+                    "ts": now.isoformat(),
+                    "zone": zone_id,
+                    "prev_moisture": round(avg_moisture_before, 1),
+                    "prev_temp": round(avg_temp_before, 1),
+                    "moisture": round(avg_moisture_now, 1),
+                    "temp": round(avg_temp_now, 1),
+                    "reward": reward,
+                    **step_result,
+                })
+
+                rl.save()
+
+                self.mqtt.publish(f"pixelos/{zone_id}/rl/reward", {
+                    "zone": zone_id,
+                    "reward": round(reward, 2),
+                    "epsilon": round(rl.epsilon, 4),
+                    "states": rl.stats()["states"],
+                    "td_error": step_result.get("td_error", 0),
+                    "ts": now.isoformat(),
+                })
+
+        except ImportError:
+            pass
+        except Exception as e:
+            log.warning("Erreur monitoring RL reward", error=str(e))
+
     def _monitor_tasks(self) -> None:
         """Surveille les taches urgentes/retard et notifie via MQTT."""
         try:
@@ -382,12 +905,25 @@ class Agent:
             log.info("Rôle auto-détecté", role="node")
 
     def _self_update(self) -> None:
-        """Mise à jour de l'agent lui-même."""
+        """Mise à jour de PixelOS via UpdateManager."""
         try:
-            subprocess.run(["pip", "install", "--upgrade", "pixelos"],
-                           timeout=60)
-            log.info("Agent mis à jour, redémarrage...")
-            os.execv(sys.executable, [sys.executable] + sys.argv)
+            from core.updater import UpdateManager
+            um = UpdateManager()
+            mode = "git" if um._has_git() else "pip"
+            result = um.update(mode=mode)
+            status = "ok" if any(
+                v.get("status") == "ok" for v in result.values()
+                if isinstance(v, dict) and "status" in v
+            ) else "error"
+            self.mqtt.publish(f"pixelos/agent/{self.node_id}/update", {
+                "ts": datetime.now().isoformat(),
+                "version": result.get("new_version", "?"),
+                "status": status,
+                "mode": mode,
+            })
+            if status == "ok":
+                log.info("Agent mis à jour, redémarrage...")
+                os.execv(sys.executable, [sys.executable] + sys.argv)
         except Exception as e:
             log.error("Échec mise à jour agent", error=str(e))
 

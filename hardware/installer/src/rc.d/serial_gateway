@@ -1,0 +1,16 @@
+#!/bin/sh
+# PixelOS - OpenBSD rc.d service for Serial↔MQTT Gateway daemon
+# Install: cp serial_gateway /etc/rc.d/
+# Enable: rcctl enable serial_gateway
+
+daemon="/usr/local/libexec/pixelos/serial_gateway"
+daemon_flags=""
+daemon_user="_pixelos_gw"
+
+. /etc/rc.d/rc.subr
+
+pexp="$daemon $daemon_flags"
+rc_bg=YES
+rc_reload=NO
+
+rc_cmd $1

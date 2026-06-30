@@ -1,0 +1,25 @@
+# PixelOS - Build daemon série RS485 pour OpenBSD
+CC = cc
+CFLAGS = -Wall -Wextra -O2 -std=c99 -D_PIXELOS
+LDFLAGS = -lpaho-mqtt3c
+
+PREFIX = /usr/local
+BINDIR = $(PREFIX)/libexec/pixelos
+CONFDIR = /etc/pixelos
+
+all: serial_gateway
+
+serial_gateway: serial_gateway.c
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+	strip $@
+
+install: serial_gateway
+	mkdir -p $(DESTDIR)$(BINDIR) $(DESTDIR)$(CONFDIR)
+	install -m 755 serial_gateway $(DESTDIR)$(BINDIR)/
+	install -m 644 nodes.conf $(DESTDIR)$(CONFDIR)/
+	install -m 644 ../configs/pixelos.yaml $(DESTDIR)$(CONFDIR)/ 2>/dev/null || true
+
+clean:
+	rm -f serial_gateway *.o
+
+.PHONY: all install clean

@@ -1,0 +1,19 @@
+#!/bin/ksh
+# rc.d/pixmanager — Service PixManager (gestionnaire de processus Pixel OS)
+#
+# Installation:
+#   doas cp etc/rc.d/pixmanager /etc/rc.d/
+#   doas chmod 755 /etc/rc.d/pixmanager
+#   doas rcctl enable pixmanager
+#   doas rcctl start pixmanager
+
+daemon="/usr/local/bin/pixmanager_daemon.py"
+daemon_user="root"
+
+. /etc/rc.d/rc.subr
+
+rc_reload=NO
+
+pexp="$daemon"
+
+rc_cmd $1

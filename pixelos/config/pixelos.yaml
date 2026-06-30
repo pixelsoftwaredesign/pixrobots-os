@@ -1,73 +1,66 @@
-# PixelOS - Configuration centrale
-# Fusionnée automatiquement avec configs locales des nœuds
-
-version: "2.0"
-instance_name: "ferme_principale"
-timezone: "Europe/Paris"
-
-mqtt:
-  broker: "localhost"
-  port: 1883
-  client_id: "pixelos-server"
-  topics:
-    capteur: "agricol/capteur/#"
-    commande: "agricol/commande/#"
-    etat: "agricol/etat/#"
-    alerte: "agricol/alerte/#"
-  qos: 1
+server:
+  host: "0.0.0.0"
+  port: 9999
+  debug: false
 
 database:
   mysql:
-    host: "localhost"
+    host: localhost
     port: 3306
-    user: "agricol"
-    password: "${MYSQL_PASSWORD}"
-    database: "agricol"
+    user: root
+    password: ""
+    database: pixelos
   mongodb:
-    uri: "mongodb://localhost:27017/agricol_ts"
+    uri: "mongodb://localhost:27017/"
+    database: pixelos
+  timescaledb:
+    host: localhost
+    port: 5432
+    user: pixelos
+    password: pixelos
+    database: pixelos
 
-backend:
-  api_url: "http://localhost:8080/api"
-  health_endpoint: "/health"
-  timeout: 5000
+mqtt:
+  broker: localhost
+  port: 1883
+  client_id: pixelos-web
+  topic_prefix: pixelos
 
-monitoring:
-  poll_interval: 10         # secondes
-  retention_days: 90
-  alert_channels:
-    email:
-      enabled: false
-      smtp_server: ""
-      recipients: []
-    telegram:
-      enabled: false
-      bot_token: ""
-      chat_id: ""
+agent:
+  id: "pixelos-main"
+  temp_dir: "/tmp/pixelos"
+  log_level: INFO
+  scan_interval: 3000
 
-irrigation:
-  auto_mode: true
-  global_hysteresis: 5.0
-  max_daily_water_per_zone: 1000  # litres
-  night_irrigation: false
-  rain_block_threshold: 2.0       # mm/h
+update:
+  repo: "https://github.com/pixelsoftwaredesign/pixelos-agricol.git"
+  branch: main
+  backup_dir: "data/backups"
 
-ota:
-  firmware_repo: "/var/lib/pixelos/firmware"
-  arduino_cli_path: "/usr/local/bin/arduino-cli"
-  esp_tool_path: "/usr/local/bin/esptool.py"
-  update_window: "02:00-04:00"    # Créneau mise à jour
+discovery:
+  scan_interval: 3000
+  wifi_enabled: true
+  ble_enabled: true
+  radio_enabled: false
+  modbus_enabled: false
 
-watchdog:
-  enabled: true
-  timeout: 30
-  action: "reset"                # reset|poweroff|notify
+production:
+  data_dir: "data/production"
+  auto_create_tasks: true
 
-backup:
-  schedule: "0 3 * * *"         # Tous les jours à 3h
-  retention: 30                 # jours
-  path: "/var/backups/pixelos"
-  include:
-    - "/etc/agricol"
-    - "/var/db/agricol"
-    - "/etc/pf.conf"
-    - "/usr/local/libexec/agricol"
+dns:
+  enabled: false
+  port: 5300
+  domain: "pxl"
+  forwarder: "8.8.8.8"
+  records:
+    pixelos.pxl: "127.0.0.1"
+    web.pxl: "127.0.0.1"
+    api.pxl: "127.0.0.1"
+    mqtt.pxl: "127.0.0.1"
+    db.pxl: "127.0.0.1"
+
+paths:
+  data: "data"
+  temp: "/tmp/pixelos"
+  models: "models"

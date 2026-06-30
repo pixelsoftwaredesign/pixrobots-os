@@ -1,0 +1,18 @@
+# PixelOS - rc.conf.local additions
+# These values are appended by the installer
+
+pixelos_agent_flags="--boot"
+pixelos_web_flags=""
+serial_gateway_flags=""
+watchdog_timeout=30
+
+# httpd reverse proxy vers Flask (port 80 → 9999)
+# Chroot dans /var/www, données PixelOS dans /var/db/pixelos/
+httpd_flags=""
+
+# relayd TLS termination (HTTPS port 443 → port 80)
+relayd_flags="-f /etc/relayd.conf"
+
+# Services not needed on headless server
+smtpd_flags=NO
+ippool_flags=NO

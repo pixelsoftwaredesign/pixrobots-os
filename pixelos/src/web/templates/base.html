@@ -116,9 +116,25 @@ iframe.streamlit {
   <a href="/" class="logo">PixelOS</a>
   <a href="/" class="{% if request.path == '/' %}active{% endif %}">Dashboard</a>
   <a href="/plantes" class="{% if request.path.startswith('/plantes') %}active{% endif %}">Plantes</a>
+  <a href="/spaces" class="{% if request.path.startswith('/spaces') %}active{% endif %}">Espaces</a>
+  <a href="/products" class="{% if request.path.startswith('/products') %}active{% endif %}">Produits</a>
+  <a href="/geothermal" class="{% if request.path.startswith('/geothermal') %}active{% endif %}">Geothermal</a>
+  <a href="/energy" class="{% if request.path.startswith('/energy') %}active{% endif %}">Energy</a>
   <a href="/tasks" class="{% if request.path.startswith('/tasks') %}active{% endif %}">Taches</a>
   <a href="/services" class="{% if request.path.startswith('/services') %}active{% endif %}">Services</a>
   <a href="/streamlit" class="{% if request.path.startswith('/streamlit') %}active{% endif %}">Dashboard</a>
+  <span class="nav-section">Comms</span>
+  <a href="/comms" class="{% if request.path.startswith('/comms') %}active{% endif %}">Comms</a>
+  <a href="/legal" class="{% if request.path.startswith('/legal') %}active{% endif %}">Charte</a>
+  <span class="nav-section">Sec</span>
+  <a href="/security" class="{% if request.path.startswith('/security') %}active{% endif %}">Security</a>
+  <a href="/processes" class="{% if request.path.startswith('/processes') %}active{% endif %}">Process</a>
+  <a href="/browser" class="{% if request.path.startswith('/browser') %}active{% endif %}">NOP</a>
+  <a href="/pixnet" class="{% if request.path.startswith('/pixnet') %}active{% endif %}">PixNet</a>
+  <span class="nav-section">Prod</span>
+  <a href="/agriproduction" class="{% if request.path.startswith('/agriproduction') %}active{% endif %}">AgriProd</a>
+  <a href="/harvest" class="{% if request.path.startswith('/harvest') %}active{% endif %}">Recolte</a>
+  <a href="/inventory" class="{% if request.path.startswith('/inventory') %}active{% endif %}">Inventaire</a>
   <span class="nav-section">Programs</span>
   <a href="/programs/text" class="{% if request.path.startswith('/programs/text') %}active{% endif %}">Text</a>
   <a href="/programs/audio" class="{% if request.path.startswith('/programs/audio') %}active{% endif %}">Audio</a>

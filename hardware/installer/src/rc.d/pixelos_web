@@ -1,0 +1,17 @@
+#!/bin/sh
+# PixelOS - OpenBSD rc.d service for PixelOS Web dashboard
+# Install: cp pixelos_web /etc/rc.d/
+# Enable: rcctl enable pixelos_web
+
+daemon="/usr/local/libexec/pixelos/web/app.py"
+daemon_flags=""
+daemon_user="_pixelos"
+daemon_chdir="/var/db/pixelos"
+
+. /etc/rc.d/rc.subr
+
+pexp="python3 ${daemon} ${daemon_flags}"
+rc_bg=YES
+rc_reload=NO
+
+rc_cmd $1

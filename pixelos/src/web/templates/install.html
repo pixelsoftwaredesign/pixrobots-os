@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Zero-Touch Installer{% endblock %}
+{% block head %}
+<style>
+.install-card { background:#16213e; border-radius:12px; padding:16px; margin:8px 0; }
+.step-ok { color:#4caf50; }
+.step-err { color:#e94560; }
+.step-warn { color:#ff9800; }
+pre.install-log { background:#0a0a1a; padding:12px; border-radius:8px; max-height:400px; overflow:auto; font-size:11px; }
+</style>
+{% endblock %}
+{% block content %}
+<h1><span style="color:#00d2ff;">Zero-Touch Installer</span> <small style="font-size:16px;color:#888;">Installation Automatisée</small></h1>
+<p>Installation PixelOS complète — Détection OS, dépendances, services, ISO.</p>
+
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;">
+  <button class="btn" onclick="runInstall()">🚀 Installation complète</button>
+  <button class="btn" onclick="checkSystem()">🔍 Vérifier système</button>
+  <button class="btn" onclick="genInstallSite()">📜 Générer install.site</button>
+  <button class="btn" onclick="genISO()">💿 Générer ISO</button>
+</div>
+
+<div id="result-area" class="install-card" style="display:none;">
+  <h3>📋 Résultat</h3>
+  <pre class="install-log" id="result-content"></pre>
+</div>
+
+<div class="card"><h3>🖥️ Configuration système</h3><div id="sys-info"></div></div>
+<div class="card"><h3>📊 Statut</h3><div id="install-status"></div></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function runInstall() {
+  showResult("Installation en cours...");
+  const r = await fetch("/api/install/run", {method:"POST", headers:{"Content-Type":"application/json"}, body:'{}'});
+  const data = await r.json();
+  showResult(JSON.stringify(data, null, 2));
+}
+
+async function checkSystem() {
+  const r = await fetch("/api/install/check");
+  const data = await r.json();
+  document.getElementById("sys-info").innerHTML = Object.entries(data).map(([k,v]) =>
+    `<div class="stat-card"><div class="stat-value">${v === true ? '✅' : v === false ? '❌' : v}</div><div>${k}</div></div>`
+  ).join('');
+}
+
+async function genInstallSite() {
+  const r = await fetch("/api/install/install-site", {method:"POST"});
+  const data = await r.json();
+  showResult(JSON.stringify(data, null, 2));
+}
+
+async function genISO() {
+  const type = prompt("Type d'ISO (openbsd/debian):", "openbsd");
+  if (!type) return;
+  showResult("Génération ISO en cours... (peut prendre plusieurs minutes)");
+  const r = await fetch(`/api/install/iso/${type}`, {method:"POST"});
+  const data = await r.json();
+  showResult(JSON.stringify(data, null, 2));
+}
+
+function showResult(text) {
+  const area = document.getElementById("result-area");
+  area.style.display = "block";
+  document.getElementById("result-content").textContent = text;
+}
+</script>
+{% endblock %}

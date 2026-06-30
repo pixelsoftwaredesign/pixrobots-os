@@ -1,0 +1,49 @@
+# PixelOS - Configuration serveur agricole OpenBSD
+mqtt:
+  broker: localhost
+  port: 1883
+
+monitoring:
+  poll_interval: 10
+  heartbeat_interval: 30
+
+database:
+  local: /var/db/pixelos/pixelos.db
+  mysql:
+    host: ""
+    port: 3306
+    user: ""
+    password: ""
+    database: agricol
+  mongodb:
+    uri: ""
+  timescaledb:
+    host: ""
+    port: 5432
+    dbname: pixelos_ts
+    user: pixelos
+    password: ""
+
+serial:
+  device: /dev/ttyU0
+  baud: 9600
+  parity: even
+  data_bits: 8
+  stop_bits: 1
+  poll_interval: 5
+  nodes_config: /etc/pixelos/nodes.conf
+
+watchdog:
+  timeout: 30
+  pet_interval: 10
+
+web:
+  port: 9999
+  templates: /usr/local/libexec/pixelos/templates
+
+storage:
+  data_dir: /var/db/pixelos/data
+  log_dir: /var/log/pixelos
+
+nodes: []
+alerts: []

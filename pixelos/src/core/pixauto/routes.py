@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, render_template
+
 from .pixauto import PixAuto
 
 pixauto_bp = Blueprint("pixauto", __name__, url_prefix="/api/pixauto")
@@ -63,6 +64,11 @@ def api_logs():
     return jsonify(_pa.get_history(limit))
 
 
+@pixauto_bp.route("/logs/clear", methods=["POST"])
+def api_logs_clear():
+    return jsonify(_pa.clear_history())
+
+
 @pixauto_bp.route("/rule/add", methods=["POST"])
 def api_rule_add():
     data = request.get_json(force=True) or {}
@@ -92,6 +98,12 @@ def api_rule_delete(rule_id):
     return jsonify(_pa.delete_rule(rule_id))
 
 
+@pixauto_bp.route("/rule/<rule_id>", methods=["PUT"])
+def api_rule_update(rule_id):
+    data = request.get_json(force=True) or {}
+    return jsonify(_pa.update_rule(rule_id, data))
+
+
 @pixauto_bp.route("/execute/<rule_id>", methods=["POST"])
 def api_execute(rule_id):
     data = request.get_json(force=True) or {}
@@ -99,6 +111,59 @@ def api_execute(rule_id):
     return jsonify(_pa.execute_rule(rule_id, sensors))
 
 
+@pixauto_bp.route("/execute-all", methods=["POST"])
+def api_execute_all():
+    results = {}
+    for r in _pa.get_rules():
+        if r.get("enabled", True):
+            results[r["id"]] = _pa.execute_rule(r["id"])
+    return jsonify({"triggered_count": sum(1 for v in results.values() if v.get("triggered")),
+                     "results": results})
+
+
 @pixauto_bp.route("/stats")
 def api_stats():
     return jsonify(_pa.stats())
+
+
+@pixauto_bp.route("/sensors", methods=["GET"])
+def api_sensors():
+    return jsonify(_pa._read_real_sensors())
+
+
+@pixauto_bp.route("/export")
+def api_export():
+    fmt = request.args.get("format", "json")
+    rules = _pa.export_rules()
+    if fmt == "json":
+        return jsonify({"count": len(rules), "rules": rules})
+    return jsonify({"error": "unsupported format"}), 400
+
+
+@pixauto_bp.route("/import", methods=["POST"])
+def api_import():
+    data = request.get_json(force=True) or {}
+    rules_data = data.get("rules", [])
+    if isinstance(rules_data, str):
+        try:
+            import json
+            rules_data = json.loads(rules_data)
+        except Exception:
+            return jsonify({"error": "invalid JSON"}), 400
+    return jsonify(_pa.import_rules(rules_data))
+
+
+@pixauto_bp.route("/webhooks", methods=["POST"])
+def api_webhook():
+    """
+    Generic webhook receiver for external services to trigger PixAuto rules.
+    POST a JSON body; matching rules will be evaluated against the payload.
+    """
+    data = request.get_json(force=True) or {}
+    results = []
+    for r in _pa.get_rules():
+        if r.get("enabled", True):
+            # Pass the webhook data as sensor_values
+            exec_result = _pa.execute_rule(r["id"], data)
+            results.append({"rule_id": r["id"], "triggered": exec_result.get("triggered")})
+    return jsonify({"results": results})
