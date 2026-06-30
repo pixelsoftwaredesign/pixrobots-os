@@ -1,3 +1,5 @@
+# Pixel OS — Copyright 2026
+# Free License — Verifiable and Reliable for Internet Users
 # Pixel Software Design — Copyright 2026
 """Routes API Web3/Pixel Pay pour l'interface Flask PixelOS."""
 

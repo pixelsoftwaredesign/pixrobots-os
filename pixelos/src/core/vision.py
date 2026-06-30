@@ -1,3 +1,5 @@
+# Pixel OS — Copyright 2026
+# Free License — Verifiable and Reliable for Internet Users
 # Pixel Software Design — Copyright 2026
 """Vision par ordinateur PixelOS â€” Suivi de croissance, segmentation, NDVI.
 

@@ -1,3 +1,5 @@
+# Pixel OS — Copyright 2026
+# Free License — Verifiable and Reliable for Internet Users
 # Pixel Software Design — Copyright 2026
 """Module Web3 PixelOS â€” BITROOT (BRT), Wallet, Paiement P2P, Ã‰change, IPFS Web3.
 

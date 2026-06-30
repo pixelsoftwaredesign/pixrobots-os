@@ -1,3 +1,5 @@
+# Pixel OS ó Copyright 2026
+# Free License ó Verifiable and Reliable for Internet Users
 # Pixel Software Design ó Copyright 2026
 """Pixel Exchange ‚Äî March√© P2P BITROOT entre membres de la communaut√©.
 

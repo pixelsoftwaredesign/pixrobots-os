@@ -1,3 +1,5 @@
+# Pixel OS ó Copyright 2026
+# Free License ó Verifiable and Reliable for Internet Users
 # Pixel Software Design ó Copyright 2026
 """dns ‚Äî Serveur DNS autoritaire PixelOS pour r√©solution priv√©e.
 

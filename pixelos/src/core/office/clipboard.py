@@ -1,3 +1,5 @@
+# Pixel OS — Copyright 2026
+# Free License — Verifiable and Reliable for Internet Users
 # Pixel Software Design — Copyright 2026
 """Pixel Clipboard â€” Presse-papier unifiÃ© entre les apps Pixel Office.
 

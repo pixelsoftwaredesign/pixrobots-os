@@ -1,3 +1,5 @@
+# Pixel OS — Copyright 2026
+# Free License — Verifiable and Reliable for Internet Users
 # Pixel Software Design — Copyright 2026
 #!/usr/bin/env python3
 """Build NOP Browser for Windows (PyInstaller).
