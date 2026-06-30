@@ -99,3 +99,13 @@ def api_history_clear():
 @orch_bp.route("/stats")
 def api_stats():
     return jsonify(_orch.stats())
+
+
+@orch_bp.route("/module/restart/<module_name>", methods=["POST"])
+def api_module_restart(module_name):
+    return jsonify(_orch.restart_module(module_name))
+
+
+@orch_bp.route("/modules/managed")
+def api_managed_modules():
+    return jsonify(_orch.get_managed_modules())

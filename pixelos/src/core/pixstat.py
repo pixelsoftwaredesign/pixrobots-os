@@ -44,7 +44,13 @@ class PixStat:
         self._watchdog_ser = None
         self._watchdog_ok = False
         self._arduino_alerts = []
+        # IPC module heartbeat monitoring
+        self._module_heartbeats: dict[str, dict] = {}
+        self._module_missed: dict[str, int] = {}
+        self._dead_modules: list[str] = []
+        self._ipc_monitor_thread: Optional[threading.Thread] = None
         self._connect_watchdog()
+        self._start_ipc_monitor()
         self._start_heartbeat()
 
     def _ensure_dirs(self):
@@ -344,6 +350,93 @@ class PixStat:
             "baud": WATCHDOG_BAUD,
             "alerts_count": len(self._arduino_alerts),
         }
+
+    # ── IPC Module Heartbeat Monitoring ─────────────────────
+
+    def _start_ipc_monitor(self):
+        """Souscrit au bus IPC et surveille les heartbeats des modules."""
+
+        def monitor_loop():
+            from .ipc import MessageBus, HB_EXPECTED_INTERVAL, HB_MISSED_LIMIT
+            bus = MessageBus()
+            bus.subscribe("heartbeat", self._on_module_heartbeat)
+            while not self._stop.is_set():
+                self._stop.wait(HB_EXPECTED_INTERVAL * 2)
+                if self._stop.is_set():
+                    break
+                try:
+                    self._check_module_health()
+                except Exception:
+                    pass
+
+        self._ipc_monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
+        self._ipc_monitor_thread.start()
+
+    def _on_module_heartbeat(self, msg):
+        """Callback appelé à chaque heartbeat de module sur le bus IPC."""
+        from .ipc import Message
+        if not isinstance(msg, Message):
+            return
+        name = msg.source
+        status = msg.payload.get("status", "RUNNING")
+        self._module_heartbeats[name] = {
+            "last_seen": datetime.now().isoformat(),
+            "status": status,
+            "pid": msg.payload.get("pid", 0),
+        }
+        self._module_missed[name] = 0
+        if name in self._dead_modules:
+            self._dead_modules.remove(name)
+
+    def _check_module_health(self):
+        """Vérifie les modules qui n'ont pas envoyé de heartbeat récemment."""
+        from .ipc import HB_EXPECTED_INTERVAL, HB_MISSED_LIMIT
+        now = time.time()
+        for name, info in list(self._module_heartbeats.items()):
+            last = info.get("last_seen", "")
+            if not last:
+                continue
+            try:
+                delta = now - datetime.fromisoformat(last).timestamp()
+            except Exception:
+                delta = HB_EXPECTED_INTERVAL * 10
+
+            if delta > HB_EXPECTED_INTERVAL * HB_MISSED_LIMIT:
+                missed = self._module_missed.get(name, 0) + 1
+                self._module_missed[name] = missed
+                if missed >= 3 and name not in self._dead_modules:
+                    self._dead_modules.append(name)
+                    alert = {
+                        "type": "module_dead",
+                        "module": name,
+                        "missed_heartbeats": missed,
+                        "last_seen": last,
+                        "ts": datetime.now().isoformat(),
+                    }
+                    self.alerts.append(alert)
+                    # Notifier PixOrchestrator pour redémarrage
+                    self._notify_orchestrator(name)
+
+    def _notify_orchestrator(self, module_name: str):
+        """Demande à PixOrchestrator de redémarrer un module défaillant."""
+        try:
+            from .ipc import MessageBus, Message, MSG_TYPE_COMMAND
+            bus = MessageBus()
+            msg = Message(
+                MSG_TYPE_COMMAND,
+                "pixstat",
+                "orchestrator",
+                {"command": "restart_module", "params": {"module": module_name}},
+            )
+            bus.publish(msg)
+        except Exception:
+            pass
+
+    def get_module_heartbeats(self) -> dict:
+        return dict(self._module_heartbeats)
+
+    def get_dead_modules(self) -> list:
+        return list(self._dead_modules)
 
     # ── Heartbeat MQTT + Série ────────────────────────────
 

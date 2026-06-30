@@ -178,6 +178,13 @@ if HAS_FLASK:
     except Exception as e:
         print(f"⚠️  PixScudo routes non chargées: {e}")
 
+    # Routes IPC Bus
+    try:
+        from core.ipc_routes import register_ipc_routes
+        register_ipc_routes(app)
+    except Exception as e:
+        print(f"⚠️  IPC routes non chargées: {e}")
+
     @app.route("/")
     def index():
         return render_template("index.html", title="PixelOS - AgriCol")

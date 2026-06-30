@@ -98,3 +98,13 @@ def api_watchdog():
 @pixstat_bp.route("/arduino/alerts")
 def api_arduino_alerts():
     return jsonify(_ps.get_arduino_alerts())
+
+
+@pixstat_bp.route("/modules/heartbeats")
+def api_module_heartbeats():
+    return jsonify(_ps.get_module_heartbeats())
+
+
+@pixstat_bp.route("/modules/dead")
+def api_dead_modules():
+    return jsonify(_ps.get_dead_modules())

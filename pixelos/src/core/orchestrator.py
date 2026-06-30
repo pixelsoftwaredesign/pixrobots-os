@@ -26,6 +26,20 @@ HISTORY_FILE = "history.json"
 
 WORKER_INTERVAL = 10
 
+# Modules connus que PixOrchestrator peut redémarrer
+MANAGED_MODULES = {
+    "pixstat": {"type": "service", "cmd": "rcctl restart pixstat"},
+    "pixdefend": {"type": "service", "cmd": "rcctl restart pixdefend"},
+    "pixdht": {"type": "service", "cmd": "rcctl restart pixdht"},
+    "pixauto": {"type": "python", "module": "core.pixauto.pixauto", "class": "PixAuto"},
+    "pixhal": {"type": "python", "module": "core.pixhal.pixhal", "class": "PixHAL"},
+    "pixkey": {"type": "python", "module": "core.pixkey.pixkey", "class": "PixKey"},
+    "pixdao": {"type": "python", "module": "core.pixdao.pixdao", "class": "PixDAO"},
+    "digital_twin": {"type": "python", "module": "core.digital_twin.twin", "class": "DigitalTwin"},
+    "agent": {"type": "service", "cmd": "rcctl restart pixelos_agent"},
+    "web": {"type": "service", "cmd": "rcctl restart pixelos_web"},
+}
+
 
 class PixOrchestrator:
     def __init__(self):
@@ -37,6 +51,7 @@ class PixOrchestrator:
         self._stop = threading.Event()
         self._worker: Optional[threading.Thread] = None
         self._start_worker()
+        self._start_ipc_listener()
 
     def _ensure_dirs(self):
         Path(ORCH_DIR).mkdir(parents=True, exist_ok=True)
@@ -404,6 +419,80 @@ class PixOrchestrator:
         self.history.clear()
         self._save_history()
         return {"status": "cleared"}
+
+    # ── Module Restart (appelé par PixStat) ──────────────
+
+    def restart_module(self, module_name: str) -> dict:
+        """Redémarre un module défaillant suite à une alerte PixStat."""
+        mod = MANAGED_MODULES.get(module_name)
+        if not mod:
+            return {"status": "error", "error": f"module {module_name} non géré"}
+
+        if mod["type"] == "service":
+            try:
+                import subprocess
+                r = subprocess.run(mod["cmd"].split(), capture_output=True, text=True, timeout=30)
+                ok = r.returncode == 0
+                self._log_restart(module_name, ok, r.stdout[:200])
+                return {"status": "ok" if ok else "error", "module": module_name,
+                        "type": "service", "output": r.stdout[:200]}
+            except Exception as e:
+                return {"status": "error", "error": str(e)}
+
+        elif mod["type"] == "python":
+            try:
+                import importlib, sys
+                # Réimporter et réinstancier le module
+                mod_spec = importlib.import_module(mod["module"])
+                cls = getattr(mod_spec, mod["class"])
+                instance = cls()
+                # Remplacer dans le module d'origine
+                orig_module = mod["module"].replace(".", "_")
+                sys.modules[orig_module] = instance
+                self._log_restart(module_name, True, f"reinstancié {mod['class']}")
+                return {"status": "ok", "module": module_name,
+                        "type": "python", "reloaded": mod["class"]}
+            except Exception as e:
+                self._log_restart(module_name, False, str(e))
+                return {"status": "error", "error": str(e)}
+
+        return {"status": "error", "error": "type inconnu"}
+
+    def _log_restart(self, module: str, ok: bool, detail: str):
+        self.history.append({
+            "event": "module_restart",
+            "module": module,
+            "success": ok,
+            "detail": detail,
+            "ts": datetime.now().isoformat(),
+        })
+        self._save_history()
+
+    def get_managed_modules(self) -> list:
+        return [{"name": k, **v} for k, v in MANAGED_MODULES.items()]
+
+    # ── IPC Listener ─────────────────────────────────────
+
+    def _start_ipc_listener(self):
+        """Écoute les commandes IPC (notamment de PixStat pour les restarts)."""
+        try:
+            from .ipc import MessageBus, MSG_TYPE_COMMAND
+            bus = MessageBus()
+
+            def on_command(msg):
+                if msg.type != MSG_TYPE_COMMAND:
+                    return
+                if msg.target and msg.target not in ("orchestrator", self.__class__.__name__):
+                    return
+                cmd = msg.payload.get("command", "")
+                if cmd == "restart_module":
+                    module = msg.payload.get("params", {}).get("module", "")
+                    if module:
+                        self.restart_module(module)
+
+            bus.subscribe("command", on_command)
+        except Exception:
+            pass
 
     # ── Stats ─────────────────────────────────────────────
 
