@@ -219,56 +219,127 @@ rc_cmd $1
 
     # ── install.site (OpenBSD auto-install) ─────────────
 
-    def generate_install_site(self, output_dir: str = "") -> dict:
-        """Génère le script install.site pour installation automatique OpenBSD."""
-        out = output_dir or INSTALL_DIR
-        Path(out).mkdir(parents=True, exist_ok=True)
+    def install_site_content(self) -> str:
+        return r"""#!/bin/sh
+# install.site -- Configuration post-installation de Pixel OS Agricole
+# Execute automatiquement apres le deballage des sets OpenBSD.
 
-        content = """#!/bin/ksh
-# install.site — PixelOS OpenBSD automatic installation
-# Placez ce fichier dans le repertoire racine de l'installateur OpenBSD
-# Execution automatique apres le premier redemarrage
+set -e
 
-echo "=== PixelOS Post-Install ==="
+TARGET="/mnt"
+SITE_TGZ="/mnt/site.tgz"
+NODE_KEY="/etc/pixnet/node_key"
+NODE_ID="/etc/pixnet/node_id"
+CONFIG_YML="/etc/pixos/config.yml"
 
-# Reseau
-echo "Configuring network..."
-echo "dhcp" > /etc/hostname.em0
+echo "=== Pixel OS Agricole -- Configuration finale ==="
 
-# Paquets
-export PKG_PATH=https://cdn.openbsd.org/pub/OpenBSD/$(uname -r)/packages/$(uname -m)/
-pkg_add python3 git curl wget py3-pip
-
-# Dependances Python
-pip3 install flask paho-mqtt cryptography requests pyyaml psutil reedsolo pyserial
-
-# Repertoires
-install -d -o root -g wheel /opt/pixelos
-install -d -o root -g wheel /var/db/pixelos
-install -d -o root -g wheel /var/log/pixelos
-
-# Recuperation du code source
-if [ -f /mnt/pixelos.tar.gz ]; then
-    tar xzf /mnt/pixelos.tar.gz -C /opt/pixelos
-elif [ -d /mnt/pixelos ]; then
-    cp -r /mnt/pixelos/* /opt/pixelos/
+# 1. Decompression de l'arborescence Pixel OS
+if [ -f "$SITE_TGZ" ]; then
+    tar xzf "$SITE_TGZ" -C "$TARGET"
+    echo "site.tgz extrait avec succes."
+else
+    echo "ATTENTION : site.tgz introuvable, installation minimale."
 fi
 
-# rc.d
-cp /opt/pixelos/src/core/boot/pixelos.rc /etc/rc.d/pixelos
-chmod 755 /etc/rc.d/pixelos
-echo "pixelos_flags=\"\"" >> /etc/rc.conf.local
-rcctl enable pixelos
-rcctl start pixelos
+# 2. Generation des cles du noeud
+mkdir -p "$TARGET/etc/pixnet"
+openssl rand -base64 32 > "$TARGET$NODE_KEY"
+chmod 600 "$TARGET$NODE_KEY"
+python3 -c "
+import hashlib
+with open('$TARGET$NODE_KEY','rb') as f:
+    print(hashlib.sha256(f.read()).hexdigest()[:32])
+" > "$TARGET$NODE_ID"
+echo "Identite du noeud : $(cat $TARGET$NODE_ID)"
 
-echo "=== PixelOS installed successfully ==="
+# 3. Configuration reseau maille (WireGuard)
+mkdir -p "$TARGET/etc/wireguard"
+
+# 4. Activation des services Pixel OS
+chroot "$TARGET" rcctl enable pixstat pixdefend pixorch pixdht pix-kernel-observer
+
+# 5. Durcissement initial (pare-feu pf)
+chroot "$TARGET" pfctl -f /etc/pf.conf
+
+# 6. Premier heartbeat pour rejoindre le reseau
+chroot "$TARGET" pixutil --join
+
+echo "=== Pixel OS installe avec succes. Redemarrez. ==="
 """
+
+    def generate_install_site(self, output_dir: str = "") -> dict:
+        out = output_dir or INSTALL_DIR
+        Path(out).mkdir(parents=True, exist_ok=True)
+        content = self.install_site_content()
         site_path = Path(out) / "install.site"
         site_path.write_text(content)
         os.chmod(site_path, 0o755)
-
         self.log_step("install_site", "ok", str(site_path))
         return {"status": "ok", "path": str(site_path)}
+
+    # ── mkiso.sh ─────────────────────────────────────────
+
+    def mkiso_content(self) -> str:
+        return r"""#!/bin/sh
+# mkiso.sh -- Genere l'image ISO bootable de Pixel OS Agricole
+# Usage : ./mkiso.sh
+
+set -e
+
+ISO_NAME="pixelos-agricol.iso"
+BUILD_DIR="/tmp/pixelos-iso"
+SITE_TGZ="site.tgz"
+VER=$(uname -r)
+OPENBSD_SETS="base${VER}.tgz comp${VER}.tgz man${VER}.tgz"
+
+echo "=== Construction de l'ISO Pixel OS Agricole ==="
+
+# 1. Preparer l'arborescence
+mkdir -p "$BUILD_DIR"
+cp $OPENBSD_SETS "$BUILD_DIR/"
+cp "$SITE_TGZ" "$BUILD_DIR/"
+
+# 2. Creer l'image ISO (UEFI + Legacy)
+mkhybrid -o "$ISO_NAME" \
+    -b /usr/mdec/cdbr -c /usr/mdec/boot.catalog \
+    -l -J -R -L -v -d -D -N \
+    -eltorito-alt-boot -eltorito-platform 0xEF -eltorito-boot /usr/mdec/cdboot \
+    "$BUILD_DIR"
+
+echo "ISO creee : $ISO_NAME"
+"""
+
+    def generate_mkiso_script(self, output_dir: str = "") -> dict:
+        out = output_dir or INSTALL_DIR
+        Path(out).mkdir(parents=True, exist_ok=True)
+        path = Path(out) / "mkiso.sh"
+        path.write_text(self.mkiso_content())
+        os.chmod(path, 0o755)
+        self.log_step("mkiso", "ok", str(path))
+        return {"status": "ok", "path": str(path)}
+
+    # ── site.tgz spec ────────────────────────────────────
+
+    def site_tgz_spec(self) -> dict:
+        return {
+            "description": "Arborescence site.tgz pour installation Pixel OS",
+            "structure": {
+                "etc/rc.conf.local": "Configuration des services (rcctl enable ...)",
+                "etc/pf.conf": "Regles pf PixDefend (rate limiting, blocage)",
+                "etc/pixos/config.yml": "Configuration Pixel OS (noeud, modules)",
+                "etc/rc.d/pixstat": "Service monitoring/heartbeat PixStat",
+                "etc/rc.d/pixdefend": "Service pare-feu PixDefend",
+                "etc/rc.d/pixorch": "Service orchestration PixOrchestrator",
+                "etc/rc.d/pixdht": "Service DHT PixDHT Query Engine",
+                "usr/local/bin/pixutil": "Utilitaire CLI Pixel OS",
+                "usr/local/bin/pixdao": "CLI DAO Pixel OS",
+                "usr/local/bin/pix-kernel-observer": "Observateur noyau temps reel",
+                "var/pixos/backup_index.json": "Index des sauvegardes PixBackup",
+                "var/pixos/trusted_peers.list": "Liste des pairs de confiance PixNet",
+            },
+            "install_site_services": ["pixstat", "pixdefend", "pixorch", "pixdht", "pix-kernel-observer"],
+        }
 
     # ── ISO Generation ──────────────────────────────────
 

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-PixStat / Heartbeat — Statistiques système et heartbeat PixelOS.
+PixStat / Heartbeat & Watchdog — Statistiques système, heartbeat, watchdog série.
 
 Collecte:
   - Connexions réseau, interfaces, bande passante
   - CPU, mémoire, disque
   - Heartbeat MQTT périodique
+  - Heartbeat série vers Arduino (watchdog robot Inspecteur)
   - Uptime, temperature CPU
   - Alertes auto en cas de seuils dépassés
 """
@@ -16,6 +17,7 @@ import time
 import subprocess
 import re
 import threading
+import hashlib
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
@@ -23,6 +25,9 @@ from typing import Optional
 
 STAT_DIR = "/var/db/pixelos/pixstat"
 HB_INTERVAL = 30
+WATCHDOG_INTERVAL = 1.0
+WATCHDOG_SERIAL = "/dev/ttyUSB0"
+WATCHDOG_BAUD = 115200
 ALERT_CPU = 80
 ALERT_MEM = 85
 ALERT_DISK = 90
@@ -36,6 +41,10 @@ class PixStat:
         self.blocklist = set()
         self._stop = threading.Event()
         self._hb_thread: Optional[threading.Thread] = None
+        self._watchdog_ser = None
+        self._watchdog_ok = False
+        self._arduino_alerts = []
+        self._connect_watchdog()
         self._start_heartbeat()
 
     def _ensure_dirs(self):
@@ -283,17 +292,77 @@ class PixStat:
         self._hb_thread = threading.Thread(target=loop, daemon=True)
         self._hb_thread.start()
 
+    # ── Watchdog série (Arduino) ───────────────────────────
+
+    def _connect_watchdog(self):
+        try:
+            import serial
+            self._watchdog_ser = serial.Serial(
+                WATCHDOG_SERIAL, WATCHDOG_BAUD, timeout=1
+            )
+            self._watchdog_ok = True
+            threading.Thread(target=self._monitor_arduino, daemon=True).start()
+        except Exception:
+            self._watchdog_ser = None
+            self._watchdog_ok = False
+
+    def _send_heartbeat_to_arduino(self):
+        if self._watchdog_ser and self._watchdog_ser.is_open:
+            try:
+                self._watchdog_ser.write(b'H')
+                self._watchdog_ser.flush()
+                self._watchdog_ok = True
+            except Exception:
+                self._watchdog_ok = False
+
+    def _monitor_arduino(self):
+        while not self._stop.is_set():
+            if not self._watchdog_ser or not self._watchdog_ser.is_open:
+                self._stop.wait(5)
+                continue
+            try:
+                line = self._watchdog_ser.readline().decode().strip()
+                if line == "ERR":
+                    self._arduino_alerts.append({
+                        "type": "arduino_critical",
+                        "message": "Arduino signale une erreur critique !",
+                        "ts": datetime.now().isoformat(),
+                    })
+                elif line == "ACK":
+                    pass
+            except Exception:
+                pass
+
+    def get_arduino_alerts(self) -> list:
+        return self._arduino_alerts[-50:]
+
+    def watchdog_status(self) -> dict:
+        return {
+            "connected": self._watchdog_ser is not None and self._watchdog_ser.is_open,
+            "heartbeat_ok": self._watchdog_ok,
+            "port": WATCHDOG_SERIAL,
+            "baud": WATCHDOG_BAUD,
+            "alerts_count": len(self._arduino_alerts),
+        }
+
+    # ── Heartbeat MQTT + Série ────────────────────────────
+
     def _publish_heartbeat(self):
+        try:
+            # Envoyer heartbeat à l'Arduino
+            self._send_heartbeat_to_arduino()
+        except Exception:
+            pass
+
         try:
             from core.mqtt import PixelOSMQTT
             mqtt = PixelOSMQTT()
             stats = self.summary()
             hostname = os.uname().nodename if hasattr(os, "uname") else "pixelos"
             node_id = hashlib.sha256(hostname.encode()).hexdigest()[:16]
-            import hashlib
-            node_id = hashlib.sha256(hostname.encode()).hexdigest()[:16]
 
             hb = {
+                "protocol": "pixnet-heartbeat-1.0",
                 "hostname": hostname,
                 "node_id": node_id,
                 "cpu": stats["cpu"],
@@ -303,6 +372,7 @@ class PixStat:
                 "temperature": stats["temperature"],
                 "connections": stats["connections"],
                 "warnings": stats["warnings"],
+                "watchdog": "active" if self._watchdog_ok else "inactive",
                 "ts": datetime.now().isoformat(),
             }
             mqtt.publish(f"pixelos/node/{node_id}/heartbeat", json.dumps(hb))
@@ -319,6 +389,11 @@ class PixStat:
 
     def stop_heartbeat(self):
         self._stop.set()
+        if self._watchdog_ser:
+            try:
+                self._watchdog_ser.close()
+            except Exception:
+                pass
         if self._hb_thread:
             self._hb_thread.join(timeout=5)
 
@@ -341,6 +416,8 @@ class PixStat:
         return {
             **s,
             "heartbeat_active": self._hb_thread is not None and self._hb_thread.is_alive(),
+            "heartbeat_interval_s": HB_INTERVAL,
+            "watchdog": self.watchdog_status(),
             "history_size": len(self.history),
             "blocklist_size": len(self.blocklist),
         }

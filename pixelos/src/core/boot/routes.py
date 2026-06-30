@@ -48,3 +48,25 @@ def api_iso_debian():
 @install_bp.route("/hooks", methods=["POST"])
 def api_hooks():
     return jsonify(_inst.post_install_hooks())
+
+
+@install_bp.route("/mkiso", methods=["POST"])
+def api_mkiso():
+    data = request.get_json(force=True) or {}
+    out = data.get("output_dir", "")
+    return jsonify(_inst.generate_mkiso_script(out))
+
+
+@install_bp.route("/site-tgz-spec")
+def api_site_tgz_spec():
+    return jsonify(_inst.site_tgz_spec())
+
+
+@install_bp.route("/install-site-content")
+def api_install_site_content():
+    return {"content": _inst.install_site_content()}
+
+
+@install_bp.route("/mkiso-content")
+def api_mkiso_content():
+    return {"content": _inst.mkiso_content()}

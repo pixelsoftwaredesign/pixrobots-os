@@ -88,3 +88,13 @@ def api_alerts():
 @pixstat_bp.route("/stats")
 def api_stats():
     return jsonify(_ps.stats())
+
+
+@pixstat_bp.route("/watchdog")
+def api_watchdog():
+    return jsonify(_ps.watchdog_status())
+
+
+@pixstat_bp.route("/arduino/alerts")
+def api_arduino_alerts():
+    return jsonify(_ps.get_arduino_alerts())
