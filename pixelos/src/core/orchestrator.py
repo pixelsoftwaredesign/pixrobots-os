@@ -1,0 +1,421 @@
+#!/usr/bin/env python3
+"""
+PixOrchestrator — Moteur d'orchestration transverse PixelOS.
+
+Coordonne les modules PixelOS:
+  - Planifie et exécute des workflows multi-étapes
+  - Déclenche des actions conditionnelles (IFTTT-like)
+  - Gère les dépendances entre tâches (DAG)
+  - Publie l'état sur MQTT
+  - S'intègre à PixAuto pour les règles d'automatisation
+"""
+
+import os
+import json
+import time
+import hashlib
+import threading
+from datetime import datetime
+from pathlib import Path
+from typing import Optional, Callable
+
+ORCH_DIR = "/var/db/pixelos/orchestrator"
+WORKFLOWS_FILE = "workflows.json"
+TASKS_FILE = "tasks.json"
+HISTORY_FILE = "history.json"
+
+WORKER_INTERVAL = 10
+
+
+class PixOrchestrator:
+    def __init__(self):
+        self._ensure_dirs()
+        self._load_workflows()
+        self._load_tasks()
+        self._load_history()
+        self._hooks: dict[str, list[Callable]] = {}
+        self._stop = threading.Event()
+        self._worker: Optional[threading.Thread] = None
+        self._start_worker()
+
+    def _ensure_dirs(self):
+        Path(ORCH_DIR).mkdir(parents=True, exist_ok=True)
+
+    def _path(self, name):
+        return str(Path(ORCH_DIR) / name)
+
+    def _load_workflows(self):
+        path = self._path(WORKFLOWS_FILE)
+        if os.path.exists(path):
+            try:
+                with open(path) as f:
+                    self.workflows = json.load(f)
+                return
+            except Exception:
+                pass
+        self.workflows = []
+
+    def _save_workflows(self):
+        with open(self._path(WORKFLOWS_FILE), "w") as f:
+            json.dump(self.workflows, f, indent=2)
+
+    def _load_tasks(self):
+        path = self._path(TASKS_FILE)
+        if os.path.exists(path):
+            try:
+                with open(path) as f:
+                    self.tasks = json.load(f)
+                return
+            except Exception:
+                pass
+        self.tasks = {}
+
+    def _save_tasks(self):
+        with open(self._path(TASKS_FILE), "w") as f:
+            json.dump(self.tasks, f, indent=2)
+
+    def _load_history(self):
+        path = self._path(HISTORY_FILE)
+        if os.path.exists(path):
+            try:
+                with open(path) as f:
+                    self.history = json.load(f)
+                return
+            except Exception:
+                pass
+        self.history = []
+
+    def _save_history(self):
+        with open(self._path(HISTORY_FILE), "w") as f:
+            json.dump(self.history[-500:], f, indent=2)
+
+    # ── Workflow CRUD ─────────────────────────────────────
+
+    def create_workflow(self, name: str, steps: list[dict]) -> dict:
+        wf = {
+            "id": hashlib.sha256(f"{name}{time.time()}".encode()).hexdigest()[:12],
+            "name": name,
+            "steps": steps,
+            "status": "idle",
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+            "execution_count": 0,
+            "last_executed": "",
+        }
+        self.workflows.append(wf)
+        self._save_workflows()
+        return wf
+
+    def get_workflows(self) -> list:
+        return self.workflows
+
+    def get_workflow(self, wf_id: str) -> Optional[dict]:
+        for w in self.workflows:
+            if w["id"] == wf_id:
+                return w
+        return None
+
+    def update_workflow(self, wf_id: str, updates: dict) -> dict:
+        for w in self.workflows:
+            if w["id"] == wf_id:
+                for k in ("name", "steps", "enabled"):
+                    if k in updates:
+                        w[k] = updates[k]
+                w["updated_at"] = datetime.now().isoformat()
+                self._save_workflows()
+                return {"status": "updated", "workflow": w}
+        return {"status": "not_found"}
+
+    def delete_workflow(self, wf_id: str) -> dict:
+        for i, w in enumerate(self.workflows):
+            if w["id"] == wf_id:
+                del self.workflows[i]
+                self._save_workflows()
+                return {"status": "deleted"}
+        return {"status": "not_found"}
+
+    # ── Task management ───────────────────────────────────
+
+    def create_task(self, task_def: dict) -> dict:
+        tid = hashlib.sha256(f"{task_def}{time.time()}".encode()).hexdigest()[:12]
+        task = {
+            "id": tid,
+            "name": task_def.get("name", "unnamed"),
+            "type": task_def.get("type", "shell"),
+            "command": task_def.get("command", ""),
+            "params": task_def.get("params", {}),
+            "depends_on": task_def.get("depends_on", []),
+            "status": "pending",
+            "created_at": datetime.now().isoformat(),
+            "started_at": "",
+            "completed_at": "",
+            "result": None,
+            "error": None,
+            "timeout": task_def.get("timeout", 60),
+            "retries": task_def.get("retries", 0),
+            "retry_count": 0,
+        }
+        self.tasks[tid] = task
+        self._save_tasks()
+        return task
+
+    def get_task(self, task_id: str) -> Optional[dict]:
+        return self.tasks.get(task_id)
+
+    def list_tasks(self, status: str = "") -> list:
+        if status:
+            return [t for t in self.tasks.values() if t.get("status") == status]
+        return list(self.tasks.values())
+
+    def cancel_task(self, task_id: str) -> dict:
+        task = self.tasks.get(task_id)
+        if not task:
+            return {"status": "not_found"}
+        if task["status"] in ("running", "pending"):
+            task["status"] = "cancelled"
+            task["error"] = "cancelled by user"
+            self._save_tasks()
+            return {"status": "cancelled"}
+        return {"status": "cannot_cancel", "current": task["status"]}
+
+    def delete_task(self, task_id: str) -> dict:
+        if task_id in self.tasks:
+            del self.tasks[task_id]
+            self._save_tasks()
+            return {"status": "deleted"}
+        return {"status": "not_found"}
+
+    # ── Execution ─────────────────────────────────────────
+
+    def execute_workflow(self, wf_id: str) -> dict:
+        wf = self.get_workflow(wf_id)
+        if not wf:
+            return {"status": "error", "error": "workflow not found"}
+
+        wf["status"] = "running"
+        wf["execution_count"] += 1
+        wf["last_executed"] = datetime.now().isoformat()
+        step_results = []
+
+        for step in wf.get("steps", []):
+            deps = step.get("depends_on", [])
+            # Vérifier les dépendances
+            dep_ok = all(
+                any(sr["id"] == d and sr.get("status") == "success"
+                    for sr in step_results)
+                for d in deps
+            )
+            if not dep_ok:
+                step_results.append({
+                    "id": step.get("id", ""),
+                    "name": step.get("name", ""),
+                    "status": "skipped",
+                    "reason": "dependency not met",
+                })
+                continue
+
+            task = self.create_task(step)
+            result = self._run_task(task["id"])
+            step_results.append({
+                "id": task["id"],
+                "name": task["name"],
+                "status": result.get("status"),
+                "result": result.get("result"),
+                "error": result.get("error"),
+            })
+
+            if result.get("status") != "success":
+                if not step.get("on_failure", "stop") == "continue":
+                    break
+
+        wf["status"] = "completed"
+        self._save_workflows()
+        self.history.append({
+            "workflow_id": wf_id,
+            "workflow_name": wf["name"],
+            "executed_at": datetime.now().isoformat(),
+            "steps": step_results,
+        })
+        self._save_history()
+        self._trigger_hook("workflow_completed", {"workflow_id": wf_id, "steps": step_results})
+        return {"workflow_id": wf_id, "status": wf["status"], "steps": step_results}
+
+    def execute_task(self, task_id: str) -> dict:
+        task = self.tasks.get(task_id)
+        if not task:
+            return {"status": "error", "error": "task not found"}
+        return self._run_task(task_id)
+
+    def _run_task(self, task_id: str) -> dict:
+        task = self.tasks.get(task_id)
+        if not task:
+            return {"status": "error", "error": "not found"}
+
+        task["status"] = "running"
+        task["started_at"] = datetime.now().isoformat()
+        self._save_tasks()
+        self._trigger_hook("task_started", {"task_id": task_id})
+
+        ttype = task.get("type", "shell")
+        result = None
+        error = None
+
+        try:
+            if ttype == "shell":
+                import subprocess
+                r = subprocess.run(
+                    task["command"], shell=True,
+                    capture_output=True, text=True,
+                    timeout=task.get("timeout", 60),
+                )
+                result = {"stdout": r.stdout[:2000], "stderr": r.stderr[:2000],
+                          "returncode": r.returncode}
+                if r.returncode != 0:
+                    error = r.stderr[:500]
+
+            elif ttype == "http":
+                import urllib.request
+                method = task.get("params", {}).get("method", "GET")
+                url = task.get("command", "")
+                if method == "GET":
+                    with urllib.request.urlopen(url, timeout=task.get("timeout", 30)) as resp:
+                        result = {"status": resp.status, "body": resp.read()[:2000].decode(errors="replace")}
+
+            elif ttype == "mqtt":
+                try:
+                    from core.mqtt import PixelOSMQTT
+                    mqtt = PixelOSMQTT()
+                    topic = task.get("command", "")
+                    payload = json.dumps(task.get("params", {}))
+                    mqtt.publish(topic, payload)
+                    result = {"published": True, "topic": topic}
+                except Exception as e:
+                    result = {"published": False, "error": str(e)}
+
+            elif ttype == "pixauto":
+                try:
+                    from core.pixauto.pixauto import PixAuto
+                    pa = PixAuto()
+                    rule_text = task.get("command", "")
+                    r = pa.add_rule(rule_text)
+                    if r.get("status") == "added":
+                        exec_r = pa.execute_rule(r["rule"]["id"])
+                        result = {"rule": r, "execution": exec_r}
+                    else:
+                        result = r
+                except Exception as e:
+                    error = str(e)
+
+            elif ttype == "webhook":
+                import urllib.request
+                url = task.get("command", "")
+                params = task.get("params", {})
+                import json as _json
+                payload = _json.dumps(params).encode()
+                req = urllib.request.Request(url, data=payload,
+                    headers={"Content-Type": "application/json"}, method="POST")
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    result = {"status": resp.status, "body": resp.read()[:2000].decode(errors="replace")}
+
+            elif ttype == "python":
+                code = task.get("command", "")
+                local_ns = {"result": None}
+                exec(code, {"__builtins__": __builtins__}, local_ns)
+                result = {"output": str(local_ns.get("result", "executed"))}
+
+            elif ttype == "sleep":
+                seconds = int(task.get("command", 1))
+                time.sleep(seconds)
+                result = {"slept": seconds}
+
+            else:
+                error = f"unknown task type: {ttype}"
+
+        except subprocess.TimeoutExpired:
+            error = "timeout"
+            result = {"error": "timeout"}
+        except Exception as e:
+            error = str(e)
+            result = {"error": str(e)}
+
+        task["status"] = "success" if error is None else "failed"
+        task["result"] = result
+        task["error"] = error
+        task["completed_at"] = datetime.now().isoformat()
+        self._save_tasks()
+        self._trigger_hook("task_completed", {"task_id": task_id, "status": task["status"]})
+        return task
+
+    # ── Worker ────────────────────────────────────────────
+
+    def _start_worker(self):
+        def loop():
+            while not self._stop.is_set():
+                self._stop.wait(WORKER_INTERVAL)
+                if self._stop.is_set():
+                    break
+                try:
+                    self._tick()
+                except Exception:
+                    pass
+        self._worker = threading.Thread(target=loop, daemon=True)
+        self._worker.start()
+
+    def _tick(self):
+        """Vérifie les tâches en attente dont les dépendances sont satisfaites."""
+        for tid, task in self.tasks.items():
+            if task["status"] != "pending":
+                continue
+            deps = task.get("depends_on", [])
+            if not deps:
+                continue
+            deps_met = all(
+                    self.tasks.get(d, {}).get("status") == "success"
+                    for d in deps
+            )
+            if deps_met:
+                threading.Thread(target=self._run_task, args=(tid,), daemon=True).start()
+
+    def stop(self):
+        self._stop.set()
+        if self._worker:
+            self._worker.join(timeout=5)
+
+    # ── Hooks ─────────────────────────────────────────────
+
+    def on(self, event: str, callback: Callable):
+        if event not in self._hooks:
+            self._hooks[event] = []
+        self._hooks[event].append(callback)
+
+    def _trigger_hook(self, event: str, data: dict):
+        for cb in self._hooks.get(event, []):
+            try:
+                cb(data)
+            except Exception:
+                pass
+
+    # ── History ───────────────────────────────────────────
+
+    def get_history(self, limit: int = 100) -> list:
+        return self.history[-limit:]
+
+    def clear_history(self) -> dict:
+        self.history.clear()
+        self._save_history()
+        return {"status": "cleared"}
+
+    # ── Stats ─────────────────────────────────────────────
+
+    def stats(self) -> dict:
+        return {
+            "workflows": len(self.workflows),
+            "tasks_total": len(self.tasks),
+            "tasks_pending": sum(1 for t in self.tasks.values() if t["status"] == "pending"),
+            "tasks_running": sum(1 for t in self.tasks.values() if t["status"] == "running"),
+            "tasks_failed": sum(1 for t in self.tasks.values() if t["status"] == "failed"),
+            "tasks_success": sum(1 for t in self.tasks.values() if t["status"] == "success"),
+            "history_size": len(self.history),
+            "hooks_registered": sum(len(v) for v in self._hooks.values()),
+            "worker_running": self._worker is not None and self._worker.is_alive(),
+        }

@@ -143,6 +143,41 @@ if HAS_FLASK:
     except Exception as e:
         print(f"⚠️  Installer routes non chargées: {e}")
 
+    # Routes PixOrchestrator
+    try:
+        from core.orchestrator_routes import register_orchestrator_routes
+        register_orchestrator_routes(app)
+    except Exception as e:
+        print(f"⚠️  PixOrchestrator routes non chargées: {e}")
+
+    # Routes PixDHT Query Engine
+    try:
+        from core.pixdht_routes import register_pixdht_routes
+        register_pixdht_routes(app)
+    except Exception as e:
+        print(f"⚠️  PixDHT routes non chargées: {e}")
+
+    # Routes PixStat / Heartbeat
+    try:
+        from core.pixstat_routes import register_pixstat_routes
+        register_pixstat_routes(app)
+    except Exception as e:
+        print(f"⚠️  PixStat routes non chargées: {e}")
+
+    # Routes PixDefend
+    try:
+        from core.pixdefend_routes import register_pixdefend_routes
+        register_pixdefend_routes(app)
+    except Exception as e:
+        print(f"⚠️  PixDefend routes non chargées: {e}")
+
+    # Routes PixScudo
+    try:
+        from core.pixscudo_routes import register_pixscudo_routes
+        register_pixscudo_routes(app)
+    except Exception as e:
+        print(f"⚠️  PixScudo routes non chargées: {e}")
+
     @app.route("/")
     def index():
         return render_template("index.html", title="PixelOS - AgriCol")
