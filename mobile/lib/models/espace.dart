@@ -1,3 +1,5 @@
+// Pixel OS - Copyright 2026
+// Free License - Verifiable and Reliable for Internet Users
 class Espace {
   final int id;
   final String nom;

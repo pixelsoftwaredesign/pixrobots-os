@@ -1,3 +1,5 @@
+// Pixel OS - Copyright 2026
+// Free License - Verifiable and Reliable for Internet Users
 class Mesure {
   final String id;
   final int zoneId;

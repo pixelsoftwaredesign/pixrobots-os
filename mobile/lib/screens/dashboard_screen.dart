@@ -1,231 +1,230 @@
+// Pixel OS - Copyright 2026
+// Free License - Verifiable and Reliable for Internet Users
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
-import '../models/espace.dart';
-import '../models/zone.dart';
-import '../services/api_service.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/sensors_provider.dart';
+import '../providers/robots_provider.dart';
+import '../providers/alerts_provider.dart';
+import '../widgets/sensor_card.dart';
+import '../widgets/robot_card.dart';
+import 'zones_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
+  const DashboardScreen({super.key});
+
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  final ApiService _api = ApiService();
-  late Future<List<Espace>> _espaces;
   int _selectedIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _espaces = _api.getEspaces();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
   }
 
-  Color _couleurHumidite(double h) {
-    if (h < 30) return Colors.red;
-    if (h < 60) return Colors.orange;
-    return Colors.green;
+  Future<void> _loadData() async {
+    final api = context.read<AuthProvider>().api;
+    if (!context.mounted) return;
+    try {
+      final status = await api.getPixStatus();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Pixel OS ${status['version'] ?? ''} â€” ${status['uptime'] ?? ''}'), duration: const Duration(seconds: 2)),
+        );
+      }
+    } catch (_) {}
+    if (context.mounted) {
+      context.read<SensorsProvider>().load();
+      context.read<RobotsProvider>().load();
+      context.read<AlertsProvider>().load();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final alerts = context.watch<AlertsProvider>();
+    final unread = alerts.unacknowledgedCount;
     return Scaffold(
-      appBar: AppBar(title: const Text('AgriCol')),
-      body: _selectedIndex == 0 ? _buildDashboard() : _buildGestion(),
+      appBar: AppBar(
+        title: const Text('AgriculApp'),
+        actions: [
+          if (unread > 0)
+            Stack(
+              children: [
+                IconButton(icon: const Icon(Icons.notifications), onPressed: () => setState(() => _selectedIndex = 4)),
+                Positioned(right: 6, top: 6, child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                  child: Text('$unread', style: const TextStyle(color: Colors.white, fontSize: 10)),
+                )),
+              ],
+            )
+          else
+            IconButton(icon: const Icon(Icons.notifications_none), onPressed: () => setState(() => _selectedIndex = 4)),
+          PopupMenuButton<String>(
+            onSelected: (v) {
+              if (v == 'logout') context.read<AuthProvider>().logout();
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'logout', child: Row(children: [Icon(Icons.logout), SizedBox(width: 8), Text('DÃ©connexion')])),
+            ],
+          ),
+        ],
+      ),
+      body: _buildBody(),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (i) => setState(() => _selectedIndex = i),
         destinations: const [
-          NavigationDestination(Icons.dashboard, 'Dashboard'),
-          NavigationDestination(Icons.settings, 'Gestion'),
+          NavigationDestination(icon: Icon(Icons.dashboard), label: 'Vue d\'ensemble'),
+          NavigationDestination(icon: Icon(Icons.sensors), label: 'Capteurs'),
+          NavigationDestination(icon: Icon(Icons.smart_toy), label: 'Robots'),
+          NavigationDestination(icon: Icon(Icons.assignment), label: 'Zones'),
+          NavigationDestination(icon: Icon(Icons.notifications), label: 'Alertes'),
         ],
       ),
     );
   }
 
-  Widget _buildDashboard() {
-    return FutureBuilder<List<Espace>>(
-      future: _espaces,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(child: Text('Erreur: ${snapshot.error}'));
-        }
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final espaces = snapshot.data!;
-        if (espaces.isEmpty) {
-          return const Center(child: Text('Aucun espace. Créez-en un dans Gestion.'));
-        }
-        return ListView(
+  Widget _buildBody() {
+    switch (_selectedIndex) {
+      case 0: return _buildOverview();
+      case 1: return const SensorsScreen();
+      case 2: return const RobotsScreen();
+      case 3: return const ZonesScreen();
+      case 4: return const AlertsScreen();
+      default: return _buildOverview();
+    }
+  }
+
+  Widget _buildOverview() {
+    final sensors = context.watch<SensorsProvider>();
+    final robots = context.watch<RobotsProvider>();
+    final alerts = context.watch<AlertsProvider>();
+    return RefreshIndicator(
+      onRefresh: () async => _loadData(),
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text('Ferme connectÃ©e', style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _StatCard(icon: Icons.sensors, label: 'Capteurs', value: '${sensors.sensors.length}', color: Colors.blue),
+              const SizedBox(width: 12),
+              _StatCard(icon: Icons.smart_toy, label: 'Robots', value: '${robots.robots.length}', color: Colors.green),
+              const SizedBox(width: 12),
+              _StatCard(icon: Icons.warning, label: 'Alertes', value: '${alerts.unacknowledgedCount}', color: alerts.unacknowledgedCount > 0 ? Colors.red : Colors.grey),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Text('Capteurs rÃ©cents', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          ...sensors.sensors.take(4).map((s) => SensorCard(sensor: s)),
+          const SizedBox(height: 24),
+          Text('Robots', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          ...robots.robots.map((r) => RobotCard(robot: r)),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  const _StatCard({required this.icon, required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Card(
+        child: Padding(
           padding: const EdgeInsets.all(16),
-          children: espaces.map((e) => _buildEspaceCard(e)).toList(),
-        );
-      },
-    );
-  }
-
-  Widget _buildEspaceCard(Espace espace) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: ExpansionTile(
-        title: Text(espace.nom, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(espace.localisation ?? ''),
-        leading: const Icon(Icons.agriculture),
-        children: [
-          FutureBuilder<List<Zone>>(
-            future: _api.getZonesByEspace(espace.id),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('Aucune zone dans cet espace'),
-                );
-              }
-              return Column(
-                children: snapshot.data!.map((z) => _buildZoneCard(z)).toList(),
-              );
-            },
+          child: Column(
+            children: [
+              Icon(icon, color: color, size: 32),
+              const SizedBox(height: 8),
+              Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
+              Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
+}
 
-  Widget _buildZoneCard(Zone zone) {
-    final h = zone.derniereHumidite ?? 0;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            height: 60,
-            width: 60,
-            child: PieChart(
-              PieChartData(
-                sections: [
-                  PieChartSectionData(
-                    value: h, color: _couleurHumidite(h),
-                    radius: 20, title: '${h.toStringAsFixed(0)}%'),
-                  PieChartSectionData(
-                    value: 100 - h, color: Colors.grey[300], radius: 20),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(zone.nom, style: const TextStyle(fontWeight: FontWeight.bold)),
-                if (zone.culture != null) Text(zone.culture!),
-                Text('Seuil: ${zone.seuilHumidite?.toStringAsFixed(0) ?? "N/A"}%'),
-              ],
-            ),
-          ),
-          Icon(
-            zone.active ? Icons.check_circle : Icons.cancel,
-            color: zone.active ? Colors.green : Colors.red,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGestion() {
+class SensorsScreen extends StatelessWidget {
+  const SensorsScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final sensors = context.watch<SensorsProvider>();
+    if (sensors.loading) return const Center(child: CircularProgressIndicator());
+    if (sensors.error != null) return Center(child: Text('Erreur: ${sensors.error}'));
+    if (sensors.sensors.isEmpty) return const Center(child: Text('Aucun capteur'));
     return ListView(
       padding: const EdgeInsets.all(16),
+      children: sensors.sensors.map((s) => SensorCard(sensor: s)).toList(),
+    );
+  }
+}
+
+class RobotsScreen extends StatelessWidget {
+  const RobotsScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final robots = context.watch<RobotsProvider>();
+    if (robots.loading) return const Center(child: CircularProgressIndicator());
+    if (robots.robots.isEmpty) return const Center(child: Text('Aucun robot'));
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: robots.robots.map((r) => RobotCard(robot: r)).toList(),
+    );
+  }
+}
+
+class AlertsScreen extends StatelessWidget {
+  const AlertsScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final alerts = context.watch<AlertsProvider>();
+    final theme = Theme.of(context);
+    return Column(
       children: [
-        const Text('Créer un Espace',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        _buildCreerEspaceForm(),
-        const SizedBox(height: 24),
-        const Text('Créer une Zone',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        _buildCreerZoneForm(),
+        if (alerts.unacknowledgedCount > 0)
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: ElevatedButton.icon(
+              onPressed: () => alerts.acknowledgeAll(),
+              icon: const Icon(Icons.done_all),
+              label: Text('Tout acquitter (${alerts.unacknowledgedCount})'),
+            ),
+          ),
+        Expanded(
+          child: alerts.alerts.isEmpty
+              ? const Center(child: Text('Aucune alerte'))
+              : ListView(
+                  children: alerts.alerts.map((a) {
+                    final color = a.severity == 'critical' ? Colors.red : a.severity == 'warning' ? Colors.orange : Colors.blue;
+                    return ListTile(
+                      leading: Icon(a.acknowledged ? Icons.check_circle_outline : Icons.warning, color: a.acknowledged ? Colors.grey : color),
+                      title: Text(a.title, style: TextStyle(fontWeight: a.acknowledged ? FontWeight.normal : FontWeight.bold)),
+                      subtitle: Text('${a.zone} Â· ${a.message}'),
+                      trailing: Text(a.timestamp.substring(11, 19), style: theme.textTheme.bodySmall),
+                      onTap: a.acknowledged ? null : () => alerts.acknowledge(a.id),
+                    );
+                  }).toList(),
+                ),
+        ),
       ],
-    );
-  }
-
-  Widget _buildCreerEspaceForm() {
-    final nomCtrl = TextEditingController();
-    final locCtrl = TextEditingController();
-    final supCtrl = TextEditingController();
-    final result = ValueNotifier<String>('');
-
-    return ValueListenableBuilder(
-      valueListenable: result,
-      builder: (context, msg, _) => Column(
-        children: [
-          TextField(controller: nomCtrl, decoration: const InputDecoration(labelText: 'Nom')),
-          TextField(controller: locCtrl, decoration: const InputDecoration(labelText: 'Localisation')),
-          TextField(controller: supCtrl, decoration: const InputDecoration(labelText: 'Superficie (ha)'), keyboardType: TextInputType.number),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                await _api.creerEspace({
-                  'nom': nomCtrl.text,
-                  'localisation': locCtrl.text,
-                  'superficieTotale': double.tryParse(supCtrl.text),
-                  'active': true,
-                });
-                result.value = 'Espace créé !';
-                _espaces = _api.getEspaces();
-                setState(() {});
-              } catch (e) {
-                result.value = 'Erreur: $e';
-              }
-            },
-            child: const Text('Créer'),
-          ),
-          Text(msg),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCreerZoneForm() {
-    final nomCtrl = TextEditingController();
-    final supCtrl = TextEditingController();
-    final cultureCtrl = TextEditingController();
-    final seuilCtrl = TextEditingController();
-    final espaceIdCtrl = TextEditingController();
-    final result = ValueNotifier<String>('');
-
-    return ValueListenableBuilder(
-      valueListenable: result,
-      builder: (context, msg, _) => Column(
-        children: [
-          TextField(controller: nomCtrl, decoration: const InputDecoration(labelText: 'Nom')),
-          TextField(controller: supCtrl, decoration: const InputDecoration(labelText: 'Superficie'), keyboardType: TextInputType.number),
-          TextField(controller: cultureCtrl, decoration: const InputDecoration(labelText: 'Culture')),
-          TextField(controller: seuilCtrl, decoration: const InputDecoration(labelText: 'Seuil humidité (%)'), keyboardType: TextInputType.number),
-          TextField(controller: espaceIdCtrl, decoration: const InputDecoration(labelText: 'ID Espace'), keyboardType: TextInputType.number),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                await _api.creerZone(int.parse(espaceIdCtrl.text), {
-                  'nom': nomCtrl.text,
-                  'superficie': double.parse(supCtrl.text),
-                  'culture': cultureCtrl.text,
-                  'seuilHumidite': double.tryParse(seuilCtrl.text),
-                  'active': true,
-                });
-                result.value = 'Zone créée !';
-              } catch (e) {
-                result.value = 'Erreur: $e';
-              }
-            },
-            child: const Text('Créer'),
-          ),
-          Text(msg),
-        ],
-      ),
     );
   }
 }
