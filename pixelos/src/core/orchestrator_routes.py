@@ -109,3 +109,30 @@ def api_module_restart(module_name):
 @orch_bp.route("/modules/managed")
 def api_managed_modules():
     return jsonify(_orch.get_managed_modules())
+
+
+# ── Zero-Touch Join / Fleet Management ───────────────────
+
+@orch_bp.route("/node/join", methods=["POST"])
+def api_node_join():
+    data = request.get_json(force=True) or {}
+    return jsonify(_orch.node_join(data))
+
+
+@orch_bp.route("/node/<node_id>/confirm", methods=["POST"])
+def api_node_confirm(node_id):
+    data = request.get_json(force=True) or {}
+    return jsonify(_orch.node_confirm(node_id))
+
+
+@orch_bp.route("/fleet")
+def api_fleet():
+    return jsonify(_orch.get_fleet())
+
+
+@orch_bp.route("/node/<node_id>")
+def api_node_get(node_id):
+    n = _orch.get_node(node_id)
+    if "error" in n:
+        return jsonify(n), 404
+    return jsonify(n)

@@ -13,6 +13,7 @@ Coordonne les modules PixelOS:
 import os
 import json
 import time
+import socket
 import hashlib
 import threading
 from datetime import datetime
@@ -50,6 +51,9 @@ class PixOrchestrator:
         self._hooks: dict[str, list[Callable]] = {}
         self._stop = threading.Event()
         self._worker: Optional[threading.Thread] = None
+        self._pending_nodes: dict[str, dict] = {}
+        self._fleet_nodes: dict[str, dict] = {}
+        self._load_fleet()
         self._start_worker()
         self._start_ipc_listener()
 
@@ -470,6 +474,83 @@ class PixOrchestrator:
 
     def get_managed_modules(self) -> list:
         return [{"name": k, **v} for k, v in MANAGED_MODULES.items()]
+
+    # ── Fleet Management (Zero-Touch Join) ──────────────
+
+    def _load_fleet(self):
+        path = Path(ORCH_DIR) / "fleet.json"
+        if path.exists():
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+                    self._fleet_nodes = data.get("nodes", {})
+                    self._pending_nodes = data.get("pending", {})
+            except Exception:
+                pass
+
+    def _save_fleet(self):
+        path = Path(ORCH_DIR) / "fleet.json"
+        with open(path, "w") as f:
+            json.dump({"nodes": self._fleet_nodes, "pending": self._pending_nodes}, f, indent=2)
+
+    def node_join(self, join_req: dict) -> dict:
+        """Accepte un nouveau nœud et lui attribue une configuration."""
+        hw_id = join_req.get("hw_id", "")
+        hostname = join_req.get("hostname", f"node-{len(self._fleet_nodes) + 1}")
+
+        node_id = hashlib.sha256(f"{hw_id}{time.time()}{os.urandom(8).hex()}".encode()).hexdigest()[:16]
+        pixnet_key = hashlib.sha256(f"{node_id}{os.urandom(32).hex()}".encode()).hexdigest()
+
+        import random
+        node_num = len(self._fleet_nodes) + 1
+        ip_address = f"10.0.0.{node_num}"
+
+        config = {
+            "node_id": node_id,
+            "hostname": hostname,
+            "ip_address": ip_address,
+            "pixnet_key": pixnet_key,
+            "orchestrator_url": f"http://{socket.gethostname()}:8080",
+            "config": {
+                "autostart": True,
+                "modules": {
+                    "pixstat": True, "pixdefend": True, "pixdht": True,
+                    "pixauto": True, "pixhal": True, "pixkey": True,
+                    "pixdao": True, "digital_twin": True,
+                },
+            },
+        }
+
+        self._fleet_nodes[node_id] = {
+            **config,
+            "hw_id": hw_id,
+            "joined_at": datetime.now().isoformat(),
+            "last_seen": datetime.now().isoformat(),
+            "status": "pending",
+        }
+        self._pending_nodes[node_id] = self._fleet_nodes[node_id]
+        self._save_fleet()
+
+        self._log_restart(f"node_join:{node_id}", True, f"New node {hostname} ({hw_id[:16]}...)")
+        return {"status": "ok", **config}
+
+    def node_confirm(self, node_id: str) -> dict:
+        """Confirme qu'un nœud a rejoint la flotte."""
+        if node_id in self._pending_nodes:
+            self._fleet_nodes[node_id]["status"] = "active"
+            self._fleet_nodes[node_id]["last_seen"] = datetime.now().isoformat()
+            del self._pending_nodes[node_id]
+            self._save_fleet()
+            self._log_restart(f"node_confirm:{node_id}", True, "Node active")
+            return {"status": "ok", "node_id": node_id}
+        return {"status": "error", "error": "node not found"}
+
+    def get_fleet(self) -> dict:
+        return {"nodes": self._fleet_nodes, "pending": self._pending_nodes}
+
+    def get_node(self, node_id: str) -> dict:
+        n = self._fleet_nodes.get(node_id) or self._pending_nodes.get(node_id)
+        return n or {"error": "not found"}
 
     # ── IPC Listener ─────────────────────────────────────
 
